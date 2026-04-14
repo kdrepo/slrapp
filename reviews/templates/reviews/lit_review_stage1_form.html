@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Literature Review - Stage 1</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .wrap { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d6deea; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        label { display: block; font-weight: 700; margin-bottom: 0.35rem; }
+        input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #b9c6d8; border-radius: 7px; padding: 0.6rem; margin-bottom: 0.8rem; }
+        button { border: 0; border-radius: 7px; padding: 0.55rem 0.8rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        .errorlist { color: #b91c1c; margin: 0.25rem 0 0.6rem; }
+        .topnav { background: #0f172a; color: #dbeafe; padding: 0.8rem 1rem; }
+        .topnav a { color: #bfdbfe; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="topnav">
+    <strong>Literature Review App</strong>
+    <span style="margin-left: 1rem;"><a href="/lit/">Stage 1</a></span>
+</div>
+<div class="wrap">
+    <div class="card">
+        <h1>Stage 1: Structure Planning</h1>
+        <p>Provide research question and target words. The app will generate section structure and word allocation.</p>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <form method="post">
+            {% csrf_token %}
+            {{ form.research_context.label_tag }}
+            {{ form.research_context }}
+            {% if form.research_context.help_text %}<p>{{ form.research_context.help_text }}</p>{% endif %}
+            {{ form.research_context.errors }}
+            {{ form.research_questions.label_tag }}
+            {{ form.research_questions }}
+            {% if form.research_questions.help_text %}<p>{{ form.research_questions.help_text }}</p>{% endif %}
+            {{ form.research_questions.errors }}
+            {{ form.target_word_count.label_tag }}
+            {{ form.target_word_count }}
+            {{ form.target_word_count.errors }}
+            <button type="submit">Generate Stage 1 Plan</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

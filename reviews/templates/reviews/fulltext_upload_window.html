@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Upload Window | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1120px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.6rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        .inline { display: inline-block; margin-right: 0.5rem; }
+        .section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+        .table-wrap { margin-top: 0.75rem; }
+        .toggle-btn { background: #0b5f58; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Phase 12: Upload Window (Full Text)</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Workflow: auto retrieval or manual/bulk upload for pending included papers.</p>
+        <form method="post" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="run_auto_retrieval">
+            <button type="submit">Run Auto PDF Retrieval</button>
+            <a href="{% url 'reviews:fulltext-retrieval-monitor' review.pk %}" style="margin-left:0.6rem;">Open Live Monitor</a>
+        </form>
+        <form method="post" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="download_pending_json">
+            <button type="submit">Download Pending URLs JSON</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="section-head">
+            <h2>Pending Included Papers (Individual Upload)</h2>
+            <button type="button" class="toggle-btn" data-target="pending-table-wrap">Hide Table</button>
+        </div>
+        <p class="muted">Only papers with <code>ta_decision=included</code> and <code>fulltext_retrieved=False</code>.</p>
+
+        <div id="pending-table-wrap" class="table-wrap">
+            {% if papers %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>DOI</th>
+                            <th>Current Source</th>
+                            <th>Upload PDF</th>
+                            <th>Skip</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for paper in papers %}
+                            <tr>
+                                <td>{{ paper.id }}</td>
+                                <td>{{ paper.title }}</td>
+                                <td>{{ paper.doi|default:"-" }}</td>
+                                <td>{{ paper.pdf_source|default:"-" }}</td>
+                                <td>
+                                    <form method="post" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="upload_pdf">
+                                        <input type="hidden" name="paper_id" value="{{ paper.id }}">
+                                        <input type="file" name="pdf_file" accept="application/pdf" required>
+                                        <button type="submit">Upload PDF</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="skip_abstract_only">
+                                        <input type="hidden" name="paper_id" value="{{ paper.id }}">
+                                        <button type="submit">Skip (Use Abstract Only)</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No included papers pending full-text retrieval.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Search Pending Included Titles (&gt; 80% Match)</h2>
+        <form method="get">
+            <label for="pending_title_search">Search title:</label>
+            <input id="pending_title_search" type="text" name="pending_title_search" value="{{ pending_title_search|default:'' }}" style="width:100%; max-width:760px;" placeholder="Paste or type title text">
+            <button type="submit" style="margin-top:0.5rem;">Search</button>
+        </form>
+
+        {% if pending_title_search %}
+            <p class="muted" style="margin-top:0.75rem;">Showing matches in pending included papers (fulltext_retrieved=False).</p>
+            <div class="section-head">
+                <span></span>
+                <button type="button" class="toggle-btn" data-target="search-table-wrap">Hide Table</button>
+            </div>
+            <div id="search-table-wrap" class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Match Score</th>
+                            <th>Paper ID</th>
+                            <th>Paper Title</th>
+                            <th>Upload PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pending_search_results %}
+                            <tr>
+                                <td>{{ item.score }}</td>
+                                <td>{{ item.paper.id }}</td>
+                                <td>{{ item.paper.title }}</td>
+                                <td>
+                                    <form method="post" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="upload_pdf">
+                                        <input type="hidden" name="paper_id" value="{{ item.paper.id }}">
+                                        <input type="file" name="pdf_file" accept="application/pdf" required>
+                                        <button type="submit">Upload PDF</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">No titles matched above 80%.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Bulk PDF Upload (Title Match &gt; 82%)</h2>
+        <p class="muted">Upload multiple PDFs. Matched files are saved as <code>{paper_id}.pdf</code>.</p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload_bulk_pdfs">
+            <p class="muted" style="margin:0.4rem 0;">Optional source folder for deletion after match (example: <code>C:\Users\iamvi\Downloads\pdfs downloaded_for_SLR</code>):</p>
+            <input type="text" name="source_folder_path" value="{{ bulk_source_folder_path|default:'' }}" style="width:100%; max-width:760px;" placeholder="C:\Users\iamvi\Downloads\pdfs downloaded_for_SLR">
+            <div style="margin-top:0.5rem;">
+                <input type="file" name="pdf_files" accept="application/pdf" multiple required>
+                <button type="submit">Upload Multiple PDFs</button>
+            </div>
+        </form>
+
+        {% if bulk_report.rows %}
+            <p class="muted" style="margin-top:0.75rem;">Last run: Files {{ bulk_report.total_files }} | Matched {{ bulk_report.matched_count }} | Unmatched {{ bulk_report.unmatched_count }} | Errors {{ bulk_report.error_count }} | Source Deleted {{ bulk_report.source_deleted_count|default:0 }} | Source Delete Failed {{ bulk_report.source_delete_failed_count|default:0 }}</p>
+
+            <form method="get" class="inline" style="margin-top:0.5rem;">
+                <input type="hidden" name="show_table" value="{{ show_table|yesno:'1,0' }}">
+                <input type="hidden" name="table_ta_decision" value="{{ selected_table_decision }}">
+                <input type="hidden" name="table_fulltext" value="{{ selected_fulltext_filter }}">
+                <input type="hidden" name="pending_title_search" value="{{ pending_title_search }}">
+                <label for="bulk_status">Status filter:</label>
+                <select id="bulk_status" name="bulk_status">
+                    {% for value, label in bulk_status_options %}
+                        <option value="{{ value }}" {% if selected_bulk_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Filter Status</button>
+            </form>
+
+            <div class="section-head">
+                <span></span>
+                <button type="button" class="toggle-btn" data-target="bulk-table-wrap">Hide Table</button>
+            </div>
+            <div id="bulk-table-wrap" class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Extracted Title</th>
+                            <th>Mapped Paper ID</th>
+                            <th>Mapped Paper Title</th>
+                            <th>Score</th>
+                            <th>Status</th>
+                            <th>Error</th>
+                            <th>Source Delete</th>
+                            <th>Delete Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in bulk_report_rows %}
+                            <tr>
+                                <td>{{ row.file_name }}</td>
+                                <td>{{ row.extracted_title|default:"-" }}</td>
+                                <td>{{ row.mapped_paper_id|default:"-" }}</td>
+                                <td>{{ row.mapped_title|default:"-" }}</td>
+                                <td>{{ row.score|default:"-" }}</td>
+                                <td>{{ row.status }}</td>
+                                <td>{{ row.error|default:"-" }}</td>
+                                <td>{{ row.source_delete_status|default:"-" }}</td>
+                                <td>{{ row.source_delete_message|default:"-" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="9">No rows for this status filter.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Paper URL Table</h2>
+        <form method="get" class="inline">
+            <input type="hidden" name="show_table" value="1">
+            <input type="hidden" name="pending_title_search" value="{{ pending_title_search }}">
+            <label for="table_ta_decision">TA decision filter:</label>
+            <select id="table_ta_decision" name="table_ta_decision">
+                {% for value, label in decision_options %}
+                    <option value="{{ value }}" {% if selected_table_decision == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <label for="table_fulltext">Fulltext retrieved:</label>
+            <select id="table_fulltext" name="table_fulltext">
+                {% for value, label in fulltext_options %}
+                    <option value="{{ value }}" {% if selected_fulltext_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Show Table</button>
+        </form>
+
+        {% if show_table %}
+            <div class="section-head">
+                <span></span>
+                <button type="button" class="toggle-btn" data-target="url-table-wrap">Hide Table</button>
+            </div>
+            <div id="url-table-wrap" class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Paper ID</th>
+                            <th>Paper Title</th>
+                            <th>URL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in table_papers %}
+                            <tr>
+                                <td>{{ row.id }}</td>
+                                <td>{{ row.title }}</td>
+                                <td>
+                                    {% if row.url %}
+                                        <a href="{{ row.url }}" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3">No papers found for this filter.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+(function () {
+    var reviewId = '{{ review.pk }}';
+
+    function storageKey(targetId) {
+        return 'fulltext_upload_window:' + reviewId + ':' + targetId;
+    }
+
+    function setButtonText(button, expanded) {
+        button.textContent = expanded ? 'Hide Table' : 'Show Table';
+    }
+
+    function applyState(button, target, targetId) {
+        var saved = localStorage.getItem(storageKey(targetId));
+        var expanded = saved !== 'hidden';
+        target.style.display = expanded ? '' : 'none';
+        setButtonText(button, expanded);
+    }
+
+    document.querySelectorAll('.toggle-btn[data-target]').forEach(function (button) {
+        var targetId = button.getAttribute('data-target');
+        var target = document.getElementById(targetId);
+        if (!target) {
+            return;
+        }
+
+        applyState(button, target, targetId);
+
+        button.addEventListener('click', function () {
+            var isHidden = target.style.display === 'none';
+            var willExpand = isHidden;
+            target.style.display = willExpand ? '' : 'none';
+            localStorage.setItem(storageKey(targetId), willExpand ? 'shown' : 'hidden');
+            setButtonText(button, willExpand);
+        });
+    });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+

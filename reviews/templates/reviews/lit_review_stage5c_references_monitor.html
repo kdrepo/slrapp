@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>LR Stage 5c References</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+        .topnav { background: #0f172a; color: #dbeafe; padding: 0.8rem 1rem; }
+        .topnav a { color: #bfdbfe; text-decoration: none; font-weight: 600; margin-right: 0.9rem; }
+    </style>
+</head>
+<body>
+<div class="topnav">
+    <strong>Literature Review App</strong>
+    <a href="{% url 'lit_reviews:stage5-writing-monitor' lit_review.pk %}">Stage 5a Writing</a>
+    <a href="{% url 'lit_reviews:stage5b-stitch-monitor' lit_review.pk %}">Stage 5b Stitching</a>
+</div>
+<div class="wrap">
+    <div class="card">
+        <h1>Stage 5c: Build Final References</h1>
+        <p>Review ID: <strong>{{ lit_review.id }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="build">Build References</button>
+            <button type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+    <div class="card">
+        {% for message in messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p>
+            References count: <strong id="references_count">{{ stage.references_count|default:0 }}</strong> |
+            Used papers: <strong id="used_count">{{ stage.used_paper_ids|length }}</strong> |
+            Missing citations: <strong id="missing_count">{{ stage.missing_reference_paper_ids|length }}</strong>
+        </p>
+        <p id="error" style="color:#b91c1c;"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Used</th>
+                    <th>Missing</th>
+                    <th>References</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.used_count|default:"-" }}</td>
+                        <td>{{ row.missing_count|default:"-" }}</td>
+                        <td>{{ row.references_count|default:"-" }}</td>
+                        <td>{% if row.error_code %}{{ row.error_code }}: {% endif %}{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>APA References List</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>APA Citation</th>
+                </tr>
+            </thead>
+            <tbody id="references-body">
+                {% for citation in stage.references_apa %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ citation }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="2">No references generated yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+(function () {
+    const statusUrl = "{% url 'lit_reviews:stage5c-references-status' lit_review.pk %}";
+    const statusEl = document.getElementById('status');
+    const refsEl = document.getElementById('references_count');
+    const usedEl = document.getElementById('used_count');
+    const missingEl = document.getElementById('missing_count');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+    const referencesBody = document.getElementById('references-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="6">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            const err = row.error_code ? (row.error_code + ': ' + (row.error_message || '')) : (row.error_message || '-');
+            return '<tr>'
+                + '<td>' + (row.time || '') + '</td>'
+                + '<td>' + (row.event || '') + '</td>'
+                + '<td>' + ((row.used_count === null || row.used_count === undefined || row.used_count === '') ? '-' : row.used_count) + '</td>'
+                + '<td>' + ((row.missing_count === null || row.missing_count === undefined || row.missing_count === '') ? '-' : row.missing_count) + '</td>'
+                + '<td>' + ((row.references_count === null || row.references_count === undefined || row.references_count === '') ? '-' : row.references_count) + '</td>'
+                + '<td>' + err + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function isTerminal(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error';
+    }
+
+    function renderReferences(refs) {
+        if (!refs || refs.length === 0) {
+            referencesBody.innerHTML = '<tr><td colspan="2">No references generated yet.</td></tr>';
+            return;
+        }
+        referencesBody.innerHTML = refs.map(function (item, idx) {
+            return '<tr><td>' + (idx + 1) + '</td><td>' + (item || '-') + '</td></tr>';
+        }).join('');
+    }
+
+    let timer = null;
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.status || 'idle';
+                refsEl.textContent = data.references_count || 0;
+                usedEl.textContent = (data.used_paper_ids || []).length;
+                missingEl.textContent = (data.missing_reference_paper_ids || []).length;
+                if (data.status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+                renderLogs(data.logs || []);
+                renderReferences(data.references_apa || []);
+                if (isTerminal(data.status) && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+            });
+    }
+
+    poll();
+    timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

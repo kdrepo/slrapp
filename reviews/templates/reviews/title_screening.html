@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Title Screening | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7fafc; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.6rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        select, input[type="text"] { width: 100%; padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+        .btn { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        .btn.alt { background: #1d4ed8; }
+        .btn.stop { background: #b91c1c; }
+        .small { color: #475569; font-size: 0.9rem; }
+        .filters { display: grid; grid-template-columns: 1fr auto; gap: 0.6rem; align-items: end; }
+        .bulk-actions { margin-top: 0.9rem; display: flex; justify-content: flex-end; }
+        .actions { display:flex; gap:0.6rem; margin-top:0.6rem; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Title Screening (Pre-Abstract)</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="small">Run DeepSeek title screening first, then proceed to abstract screening.</p>
+        <form method="post" class="actions">
+            {% csrf_token %}
+            <input type="hidden" name="current_title_decision" value="{{ selected_decision }}">
+            <button class="btn" type="submit" name="action" value="run">Run Title Screening</button>
+            <button class="btn alt" type="submit" name="action" value="retry_failed">Retry Failed</button>
+            <button class="btn stop" type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p class="small">Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Done: <strong id="done">{{ stage.done|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong> | Pending: <strong id="pending">{{ stage.pending|default:0 }}</strong></p>
+        <p id="error" class="small"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Decision</th>
+                    <th>Title</th>
+                    <th>Error Code</th>
+                    <th>Error Message</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id|default:"-" }}</td>
+                        <td>{{ row.decision|default:"-" }}</td>
+                        <td>{{ row.title|default:"-" }}</td>
+                        <td>{{ row.error_code|default:"-" }}</td>
+                        <td>{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <form method="get" class="filters">
+            <div>
+                <label for="title_decision">Title decision filter</label>
+                <select id="title_decision" name="title_decision">
+                    {% for value, label in decision_options %}
+                        <option value="{{ value }}" {% if selected_decision == value %}selected{% endif %}>{{ label }}{% if value != 'all' %} ({{ value }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <button class="btn" type="submit">Apply Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        {% if papers %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="current_title_decision" value="{{ selected_decision }}">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Current Decision</th>
+                            <th>Confidence</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Override</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for paper in papers %}
+                            <tr>
+                                <td>{{ paper.id }}</td>
+                                <td><strong>{{ paper.title }}</strong></td>
+                                <td>{{ paper.title_screening_decision }}</td>
+                                <td>{{ paper.title_screening_confidence }}</td>
+                                <td>{{ paper.title_screening_reason|default:"" }}</td>
+                                <td>
+                                    {{ paper.title_screening_status|default:"" }}
+                                    {% if paper.title_screening_error %}
+                                        <br><span class="small">{{ paper.title_screening_error }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <select name="decision_{{ paper.id }}">
+                                        <option value="" {% if not default_override_decision %}selected{% endif %}>--select--</option>
+                                        {% for value, label in title_decision_choices %}
+                                            <option value="{{ value }}" {% if default_override_decision == value %}selected{% endif %}>{{ value }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="text" name="note_{{ paper.id }}" placeholder="Optional note">
+                                    <button class="btn" type="submit" name="action" value="single" formaction="{% url 'reviews:title-screening' review.pk %}" formmethod="post" onclick="this.form.querySelector('input[name=\'paper_id\']').value='{{ paper.id }}'">Update</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <input type="hidden" name="paper_id" value="">
+                <div class="bulk-actions">
+                    <button class="btn" type="submit" name="action" value="export_excel">Export Excel</button>
+                    <button class="btn" type="submit" name="action" value="bulk">Update All Rows</button>
+                </div>
+            </form>
+        {% else %}
+            <p>No papers found for this filter selection.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const statusUrl = "{% url 'reviews:title-screening-status' review.pk %}";
+    const statusEl = document.getElementById('status');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const doneEl = document.getElementById('done');
+    const failedEl = document.getElementById('failed');
+    const pendingEl = document.getElementById('pending');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="7">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            return '<tr>' +
+                '<td>' + (row.time || '') + '</td>' +
+                '<td>' + (row.event || '') + '</td>' +
+                '<td>' + (row.paper_id || '-') + '</td>' +
+                '<td>' + (row.decision || '-') + '</td>' +
+                '<td>' + (row.title || '-') + '</td>' +
+                '<td>' + (row.error_code || '-') + '</td>' +
+                '<td>' + (row.error_message || '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function isTerminal(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error' || status === 'idle';
+    }
+
+    let timer = null;
+
+    function stopPolling() {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    }
+
+    function scheduleNext(ms) {
+        stopPolling();
+        timer = setTimeout(poll, ms);
+    }
+
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                const status = data.status || 'idle';
+                statusEl.textContent = status;
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+                pendingEl.textContent = data.pending || 0;
+
+                if (status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+
+                renderLogs(data.logs || []);
+
+                if (isTerminal(status)) {
+                    stopPolling();
+                } else {
+                    scheduleNext(2500);
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+                scheduleNext(5000);
+            });
+    }
+
+    poll();
+})();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Full-Text Screening | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1120px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.35rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+        .small { font-size: 0.86rem; color: #475569; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Phase: Full-Text Screening (DeepSeek + MinerU)</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Pipeline: screen included full-text papers in chunks of 5 via DeepSeek.</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="start_screening">Start Screening (Chunk=5)</button>
+            <button type="submit" name="action" value="retry_screening">Retry Screening Failed</button>
+            <button type="submit" name="action" value="stop">Stop Screening</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p class="muted">Mode: <strong id="run_mode">{{ stage.run_mode|default:"deepseek" }}</strong> | Chunk: <strong id="chunk_size">{{ stage.chunk_size|default:5 }}</strong> | Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Done: <strong id="done">{{ stage.done|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong></p>
+        <p id="error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Decision</th>
+                    <th>Title</th>
+                    <th>Error Code</th>
+                    <th>Error Message</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id|default:"-" }}</td>
+                        <td>{{ row.decision|default:"-" }}</td>
+                        <td>{{ row.title|default:"-" }}</td>
+                        <td>{{ row.error_code|default:"-" }}</td>
+                        <td>{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Completed Full-Text Decisions</h2>
+        <p class="small">Rows with full-text decision already assigned.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Paper ID</th>
+                    <th>Title</th>
+                    <th>Decision</th>
+                    <th>Provider</th>
+                    <th>Model</th>
+                    <th>Screening Status</th>
+                    <th>RQ Tags</th>
+                    <th>Exclusion Reason</th>
+                    <th>RQ1 Summary</th>
+                    <th>RQ2 Summary</th>
+                    <th>Notes</th>
+                    <th>Screened At</th>
+                </tr>
+            </thead>
+            <tbody id="results-body">
+                {% for row in completed_results %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.title }}</td>
+                        <td>{{ row.full_text_decision }}</td>
+                        <td>{{ row.full_text_screening_provider|default:"-" }}</td>
+                        <td>{{ row.full_text_screening_model|default:"-" }}</td>
+                        <td>{{ row.full_text_screening_status|default:"-" }}</td>
+                        <td>{{ row.full_text_rq_tags|join:", " }}</td>
+                        <td>{{ row.full_text_exclusion_reason|default:"-" }}</td>
+                        <td>{{ row.full_text_rq1_findings_summary|default:"-" }}</td>
+                        <td>{{ row.full_text_rq2_findings_summary|default:"-" }}</td>
+                        <td>{{ row.full_text_notes|default:"-" }}</td>
+                        <td>{{ row.full_text_screened_at|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="12">No completed full-text decisions yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const statusUrl = "{% url 'reviews:fulltext-screening-status' review.pk %}";
+    const statusEl = document.getElementById('status');
+    const runModeEl = document.getElementById('run_mode');
+    const chunkEl = document.getElementById('chunk_size');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const doneEl = document.getElementById('done');
+    const failedEl = document.getElementById('failed');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+    const resultsBody = document.getElementById('results-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="7">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            return '<tr>' +
+                '<td>' + (row.time || '') + '</td>' +
+                '<td>' + (row.event || '') + '</td>' +
+                '<td>' + (row.paper_id || '-') + '</td>' +
+                '<td>' + (row.decision || '-') + '</td>' +
+                '<td>' + (row.title || '-') + '</td>' +
+                '<td>' + (row.error_code || '-') + '</td>' +
+                '<td>' + (row.error_message || '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderResults(rows) {
+        if (!rows || rows.length === 0) {
+            resultsBody.innerHTML = '<tr><td colspan="12">No completed full-text decisions yet.</td></tr>';
+            return;
+        }
+        resultsBody.innerHTML = rows.map(function (row) {
+            const tags = Array.isArray(row.full_text_rq_tags) ? row.full_text_rq_tags.join(', ') : '';
+            return '<tr>' +
+                '<td>' + (row.id || '-') + '</td>' +
+                '<td>' + (row.title || '-') + '</td>' +
+                '<td>' + (row.full_text_decision || '-') + '</td>' +
+                '<td>' + (row.full_text_screening_provider || '-') + '</td>' +
+                '<td>' + (row.full_text_screening_model || '-') + '</td>' +
+                '<td>' + (row.full_text_screening_status || '-') + '</td>' +
+                '<td>' + (tags || '-') + '</td>' +
+                '<td>' + (row.full_text_exclusion_reason || '-') + '</td>' +
+                '<td>' + (row.full_text_rq1_findings_summary || '-') + '</td>' +
+                '<td>' + (row.full_text_rq2_findings_summary || '-') + '</td>' +
+                '<td>' + (row.full_text_notes || '-') + '</td>' +
+                '<td>' + (row.full_text_screened_at || '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function isTerminalStatus(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error';
+    }
+
+    let timer = null;
+
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.status || 'idle';
+                runModeEl.textContent = data.run_mode || 'deepseek';
+                chunkEl.textContent = data.chunk_size || 5;
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+
+                if (data.status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+
+                renderLogs(data.logs || []);
+                renderResults(data.completed_results || []);
+
+                if (isTerminalStatus(data.status) && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+            });
+    }
+
+    poll();
+    timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>
+

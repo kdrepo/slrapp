@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Theme Synthesis | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f6f8fc; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.4rem; }
+        .muted { color: #475569; font-size: 0.92rem; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Phase 17: Thematic Synthesis Matrix</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="start">Start</button>
+            <button type="submit" name="action" value="retry">Retry</button>
+            <button type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+    <div class="card">
+        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <strong id="status">{{ stage.status|default:"idle" }}</strong></p>
+        <p class="muted">Theme synthesis status: <strong id="model_status">{{ review.theme_synthesis_status|default:"" }}</strong></p>
+        <p id="error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Logs</h2>
+        <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Message</th><th>Error</th></tr></thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                <tr>
+                    <td>{{ row.time }}</td>
+                    <td>{{ row.event }}</td>
+                    <td>{{ row.message|default:"-" }}</td>
+                    <td>{% if row.error_code %}{{ row.error_code }}: {{ row.error_message }}{% else %}-{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No logs yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Theme Output</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Theme</th>
+                    <th>Grade</th>
+                    <th>Paper Count</th>
+                    <th>% Corpus</th>
+                    <th>Direction</th>
+                    <th>Designs</th>
+                    <th>Paper IDs</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody id="themes-body">
+                {% for t in themes %}
+                <tr>
+                    <td>{{ t.theme_name }}</td>
+                    <td>{{ t.evidence_grade }}</td>
+                    <td>{{ t.paper_count }}</td>
+                    <td>{{ t.pct_of_corpus }}</td>
+                    <td>{{ t.finding_direction }}</td>
+                    <td>{{ t.designs_represented|join:", " }}</td>
+                    <td>{{ t.paper_ids|join:", " }}</td>
+                    <td>{{ t.grade_rationale }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8">No themes generated yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function(){
+  const statusUrl = "{% url 'reviews:theme-synthesis-status' review.pk %}";
+  const statusEl = document.getElementById('status');
+  const modelStatusEl = document.getElementById('model_status');
+  const errorEl = document.getElementById('error');
+  const logsBody = document.getElementById('logs-body');
+  const themesBody = document.getElementById('themes-body');
+
+  function renderLogs(logs){
+    if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
+    logsBody.innerHTML = logs.map(l => '<tr><td>'+(l.time||'')+'</td><td>'+(l.event||'')+'</td><td>'+(l.message||'-')+'</td><td>'+((l.error_code? (l.error_code+': '+(l.error_message||'')) : '-'))+'</td></tr>').join('');
+  }
+
+  function renderThemes(themes){
+    if(!themes || !themes.length){ themesBody.innerHTML='<tr><td colspan="8">No themes generated yet.</td></tr>'; return; }
+    themesBody.innerHTML = themes.map(t => {
+      const designs = Array.isArray(t.designs_represented) ? t.designs_represented.join(', ') : '-';
+      const ids = Array.isArray(t.paper_ids) ? t.paper_ids.join(', ') : '-';
+      return '<tr><td>'+(t.theme_name||'-')+'</td><td>'+(t.evidence_grade||'-')+'</td><td>'+(t.paper_count||0)+'</td><td>'+(t.pct_of_corpus||0)+'</td><td>'+(t.finding_direction||'-')+'</td><td>'+designs+'</td><td>'+ids+'</td><td>'+(t.grade_rationale||'-')+'</td></tr>';
+    }).join('');
+  }
+
+  function isTerminal(s){ return s==='completed' || s==='stopped' || s==='error'; }
+
+  let timer = null;
+  function poll(){
+    fetch(statusUrl).then(r=>r.json()).then(data=>{
+      statusEl.textContent = data.status || 'idle';
+      modelStatusEl.textContent = data.theme_synthesis_status || '';
+      errorEl.textContent = data.status === 'error' ? ('Error ['+(data.error_code||'UnknownError')+']: '+(data.error_message||'')) : '';
+      renderLogs(data.logs || []);
+      renderThemes(data.themes || []);
+      if(isTerminal(data.status) && timer){ clearInterval(timer); timer = null; }
+    }).catch(()=>{ errorEl.textContent = 'Status polling failed. Retrying...'; });
+  }
+
+  poll();
+  timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>
+
+

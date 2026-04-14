@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>All Screening Decisions | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7fafc; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.6rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        select, input[type="text"] { width: 100%; padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+        .btn { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        .small { color: #475569; font-size: 0.9rem; }
+        .filters { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.6rem; align-items: end; }
+        .bulk-actions { margin-top: 0.9rem; display: flex; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>All Screening Decisions</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="small">Filter by TA decision and confidence interval (including less than 0.70), then override any individual paper or apply bulk update at the end.</p>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <form method="get" class="filters">
+            <div>
+                <label for="ta_decision">TA decision filter</label>
+                <select id="ta_decision" name="ta_decision">
+                    {% for value, label in decision_options %}
+                        <option value="{{ value }}" {% if selected_decision == value %}selected{% endif %}>{{ label }}{% if value != 'all' %} ({{ value }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="confidence_band">Confidence interval filter</label>
+                <select id="confidence_band" name="confidence_band">
+                    {% for value, label in confidence_bands %}
+                        <option value="{{ value }}" {% if selected_confidence == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <button class="btn" type="submit">Apply Filters</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        {% if papers %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="current_ta_decision" value="{{ selected_decision }}">
+                <input type="hidden" name="current_confidence_band" value="{{ selected_confidence }}">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Current Decision</th>
+                            <th>Confidence</th>
+                            <th>Citations</th>
+                            <th>Reason</th>
+                            <th>Override</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for paper in papers %}
+                            <tr>
+                                <td>{{ paper.id }}</td>
+                                <td>
+                                    <strong>{{ paper.title }}</strong><br>
+                                    <span class="small">{{ paper.authors|default:"" }}</span>
+                                </td>
+                                <td>{{ paper.ta_decision|default:"(empty)" }}</td>
+                                <td>{{ paper.ta_confidence }}</td>
+                                <td>{{ paper.citation_count }}</td>
+                                <td>{{ paper.ta_reason|default:"" }}</td>
+                                <td>
+                                    <select name="decision_{{ paper.id }}">
+                                        <option value="" {% if not default_override_decision %}selected{% endif %}>--select--</option>
+                                        <option value="included" {% if default_override_decision == 'included' %}selected{% endif %}>included</option>
+                                        <option value="excluded" {% if default_override_decision == 'excluded' %}selected{% endif %}>excluded</option>
+                                        <option value="flagged" {% if default_override_decision == 'flagged' %}selected{% endif %}>flagged</option>
+                                        <option value="temp_flag" {% if default_override_decision == 'temp_flag' %}selected{% endif %}>temp_flag</option>
+                                        <option value="manual_flag" {% if default_override_decision == 'manual_flag' %}selected{% endif %}>manual_flag</option>
+                                        <option value="missing_abs" {% if default_override_decision == 'missing_abs' %}selected{% endif %}>missing_abs</option>
+                                        <option value="not_processed" {% if default_override_decision == 'not_processed' %}selected{% endif %}>not_processed</option>
+                                        <option value="empty" {% if default_override_decision == 'empty' %}selected{% endif %}>empty (NULL legacy)</option>
+                                    </select>
+                                    <input type="text" name="note_{{ paper.id }}" placeholder="Optional note for audit trail">
+                                    <button class="btn" type="submit" name="action" value="single" formaction="{% url 'reviews:screening-decisions' review.pk %}" formmethod="post" onclick="this.form.querySelector('input[name=\'paper_id\']').value='{{ paper.id }}'">Update</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <input type="hidden" name="paper_id" value="">
+                <div class="bulk-actions">
+                    <button class="btn" type="submit" name="action" value="export_excel">Export Excel</button>
+                    <button class="btn" type="submit" name="action" value="bulk">Update All Rows</button>
+                </div>
+            </form>
+        {% else %}
+            <p>No papers found for this filter selection.</p>
+        {% endif %}
+    </div>
+
+</div>
+</body>
+</html>
+
+
+
+
+

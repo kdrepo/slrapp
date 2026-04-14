@@ -1,0 +1,84 @@
+<style>
+  .slr-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+    border-bottom: 1px solid #243244;
+    box-shadow: 0 4px 14px rgba(2, 8, 20, 0.24);
+    padding: 10px 14px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+  }
+  .slr-nav .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0; }
+  .slr-nav .brand { color: #dbeafe; font-weight: 700; text-decoration: none; margin-right: 10px; }
+  .slr-nav .stage { color: #93c5fd; font-size: 12px; letter-spacing: .02em; font-weight: 700; margin-right: 4px; }
+  .slr-nav .chip {
+    display: inline-block; color: #e5e7eb; background: rgba(148, 163, 184, 0.14);
+    border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 999px;
+    padding: 5px 10px; font-size: 12px; font-weight: 600; text-decoration: none;
+    transition: all .15s ease;
+  }
+  .slr-nav .chip:hover { background: rgba(59, 130, 246, 0.25); border-color: rgba(96, 165, 250, 0.6); color: #eff6ff; }
+  .slr-nav .chip.debug { background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.36); color: #fde68a; }
+</style>
+
+<div class="slr-nav">
+  <div class="row">
+    <a class="brand" href="{% url 'reviews:review-create' %}">SLR Engine</a>
+    {% if review %}
+      <a class="chip" href="{% url 'reviews:review-detail' review.pk %}">Review Home</a>
+      <a class="chip" href="{% url 'reviews:scaffold-editor' review.pk %}">Scaffold</a>
+    {% else %}
+      <a class="chip" href="{% url 'reviews:review-create' %}">Create Review</a>
+    {% endif %}
+  </div>
+
+  {% if review %}
+  <div class="row">
+    <span class="stage">Phase 1-3 Intake & Search</span>
+    <a class="chip" href="{% url 'reviews:review-confirm' review.pk %}">Confirm Parameters</a>
+    <a class="chip" href="{% url 'reviews:search-strategy' review.pk %}">Search Strategy</a>
+    <a class="chip" href="{% url 'reviews:ris-upload' review.pk %}">RIS Upload</a>
+  </div>
+
+  <div class="row">
+    <span class="stage">Phase 6 Title Screening</span>
+    <a class="chip" href="{% url 'reviews:title-screening' review.pk %}">Title Screening</a>
+    <a class="chip" href="{% url 'reviews:title-missing-abstracts' review.pk %}">Missing Abstracts</a>
+  </div>
+
+  <div class="row">
+    <span class="stage">Phase 7-10 TA Screening</span>
+    <a class="chip" href="{% url 'reviews:screening-dashboard' review.pk %}">Dashboard</a>
+    <a class="chip" href="{% url 'reviews:screening-decisions' review.pk %}">Decisions</a>
+    <a class="chip" href="{% url 'reviews:screening-conflicts' review.pk %}">Conflicts</a>
+    <a class="chip" href="{% url 'reviews:screening-export' review.pk %}">Export/Import</a>
+    <a class="chip debug" href="{% url 'reviews:screening-batch-debug' review.pk %}">TA Debug</a>
+  </div>
+
+  <div class="row">
+    <span class="stage">Phase 11-16 Full Text</span>
+    <a class="chip" href="{% url 'reviews:fulltext-upload-window' review.pk %}">Upload Window</a>
+    <a class="chip" href="{% url 'reviews:fulltext-retrieval-monitor' review.pk %}">Retrieval</a>
+    <a class="chip" href="{% url 'reviews:mineru-monitor' review.pk %}">MinerU</a>
+    <a class="chip" href="{% url 'reviews:fulltext-screening-monitor' review.pk %}">Screening</a>
+    <a class="chip" href="{% url 'reviews:fulltext-final-decisions' review.pk %}">Final Decisions</a>
+    <a class="chip" href="{% url 'reviews:deepseek-summery-monitor' review.pk %}">Summary/Extraction</a>
+    <a class="chip debug" href="{% url 'reviews:elsevier-pdf-debug' review.pk %}">Elsevier Debug</a>
+  </div>
+
+  <div class="row">
+    <span class="stage">Phase 17-23 Synthesis & Writing</span>
+    <a class="chip" href="{% url 'reviews:theme-synthesis-monitor' review.pk %}">Theme Synthesis</a>
+    <a class="chip" href="{% url 'reviews:dialectical-monitor' review.pk %}">Dialectical</a>
+    <a class="chip" href="{% url 'reviews:ghostwriter-monitor' review.pk %}">Ghostwriter</a>
+  </div>
+
+  <div class="row">
+    <span class="stage">Visuals</span>
+    <a class="chip" href="{% url 'reviews:visual-assets-monitor' review.pk %}">Visual Assets</a>
+    <a class="chip" href="{% url 'reviews:visual-assets-gallery' review.pk %}">Visual Gallery</a>
+  </div>
+  {% endif %}
+</div>
+

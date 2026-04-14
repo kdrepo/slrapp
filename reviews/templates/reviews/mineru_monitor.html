@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>MinerU Monitor | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; }
+        th { background: #eff5fa; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>MinerU PDF to Markdown Monitor</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Converts included, retrieved PDFs into Markdown using MinerU API.</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="process_not_done">Process Not Done</button>
+            <button type="submit" name="action" value="retry_failed">Retry Remaining/Failed</button>
+            <button type="submit" name="action" value="run_ref_delete">Run Reference Delete (Not Done)</button>
+            <button type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p class="muted">Job: <strong id="job_type">{{ stage.job_type|default:"parse" }}</strong> | Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Done: <strong id="done">{{ stage.done|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong></p>
+        <p id="error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Batch ID</th>
+                    <th>Markdown Chars</th>
+                    <th>Title</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id }}</td>
+                        <td>{{ row.batch_id|default:"-" }}</td>
+                        <td>{{ row.markdown_chars|default:"-" }}</td>
+                        <td>{{ row.title }}</td>
+                        <td>{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const statusUrl = "{% url 'reviews:mineru-status' review.pk %}";
+    const statusEl = document.getElementById('status');
+    const jobTypeEl = document.getElementById('job_type');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const doneEl = document.getElementById('done');
+    const failedEl = document.getElementById('failed');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="7">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            const time = row.time || '';
+            const event = row.event || '';
+            const paperId = row.paper_id || '';
+            const batchId = row.batch_id || '-';
+            const markdownChars = (row.markdown_chars === null || row.markdown_chars === undefined || row.markdown_chars === '') ? '-' : row.markdown_chars;
+            const title = row.title || '';
+            const err = row.error_message || '-';
+            return '<tr><td>' + time + '</td><td>' + event + '</td><td>' + paperId + '</td><td>' + batchId + '</td><td>' + markdownChars + '</td><td>' + title + '</td><td>' + err + '</td></tr>';
+        }).join('');
+    }
+    function isTerminalStatus(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error';
+    }
+
+    let pollTimer = null;
+
+    function pollAndMaybeStop() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.status || 'idle';
+                jobTypeEl.textContent = data.job_type || 'parse';
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+
+                if (data.status === 'error') {
+                    const code = data.error_code || 'UnknownError';
+                    const msg = data.error_message || '';
+                    errorEl.textContent = 'Error [' + code + ']: ' + msg;
+                } else {
+                    errorEl.textContent = '';
+                }
+
+                renderLogs(data.logs || []);
+
+                if (isTerminalStatus(data.status) && pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+            });
+    }
+
+    pollAndMaybeStop();
+    pollTimer = setInterval(pollAndMaybeStop, 2500);
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+

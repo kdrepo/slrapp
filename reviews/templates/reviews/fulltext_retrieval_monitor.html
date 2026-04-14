@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Full-Text Retrieval Monitor | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1080px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; }
+        th { background: #eff5fa; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Full-Text Retrieval Monitor</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Triggers Elsevier then Unpaywall. Status updates per paper are shown below.</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="start">Start Retrieval</button>
+            <button type="submit" name="action" value="retry">Retry Remaining</button>
+            <button type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p class="muted">Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Downloaded: <strong id="downloaded">{{ stage.downloaded|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong> | Skipped: <strong id="skipped">{{ stage.skipped_existing|default:0 }}</strong></p>
+        <p id="error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Paper Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Source</th>
+                    <th>Status Code</th>
+                    <th>Error Message</th>
+                    <th>Title</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id }}</td>
+                        <td>{{ row.source|default:"-" }}</td>
+                        <td>{{ row.status_code|default:"-" }}</td>
+                        <td>{{ row.error_message|default:"-" }}</td>
+                        <td>{{ row.title }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    const statusEl = document.getElementById('status');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const downloadedEl = document.getElementById('downloaded');
+    const failedEl = document.getElementById('failed');
+    const skippedEl = document.getElementById('skipped');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+    const statusUrl = "{% url 'reviews:fulltext-retrieval-status' review.pk %}";
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="7">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function(row) {
+            const time = row.time || '';
+            const event = row.event || '';
+            const paperId = row.paper_id || '';
+            const source = row.source || '-';
+            const statusCode = (row.status_code === null || row.status_code === undefined || row.status_code === '') ? '-' : row.status_code;
+            const errorMessage = row.error_message || '-';
+            const title = row.title || '';
+            return '<tr><td>' + time + '</td><td>' + event + '</td><td>' + paperId + '</td><td>' + source + '</td><td>' + statusCode + '</td><td>' + errorMessage + '</td><td>' + title + '</td></tr>';
+        }).join('');
+    }
+
+    function poll() {
+        fetch(statusUrl)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                statusEl.textContent = data.status || 'idle';
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                downloadedEl.textContent = data.downloaded || 0;
+                failedEl.textContent = data.failed || 0;
+                skippedEl.textContent = data.skipped_existing || 0;
+                if (data.status === 'error') {
+                    const code = data.error_code || 'UnknownError';
+                    const msg = data.error_message || '';
+                    errorEl.textContent = 'Error [' + code + ']: ' + msg;
+                } else {
+                    errorEl.textContent = '';
+                }
+                renderLogs(data.logs || []);
+            })
+            .catch(function() {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+            });
+    }
+
+    poll();
+    setInterval(poll, 2000);
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+

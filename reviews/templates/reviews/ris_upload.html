@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>RIS Upload | {{ review.title }}</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            margin: 0;
+            background: #f4f8fb;
+            color: #1f2937;
+        }
+        .wrap {
+            max-width: 980px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #d5dde7;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #d8e2ea;
+            padding: 0.7rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #eff5fa; }
+        .status-pill {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            border: 1px solid #cbd5e1;
+        }
+        .done { background: #ecfdf5; border-color: #86efac; }
+        .todo { background: #fff7ed; border-color: #fdba74; }
+        button {
+            border: 0;
+            border-radius: 7px;
+            padding: 0.5rem 0.9rem;
+            background: #0f766e;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-dedupe {
+            background: #1d4ed8;
+            padding: 0.6rem 1rem;
+        }
+        .report {
+            background: #eefbf8;
+            border-left: 4px solid #10b981;
+            padding: 0.8rem;
+            border-radius: 6px;
+        }
+        .hint {
+            color: #334155;
+            margin-top: 0.4rem;
+        }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Upload Scopus RIS Files</h1>
+        <p>Upload any subset of the 4 query RIS files. Uploads are optional per query. You can also upload a title list file (.csv/.xlsx, first column = title). When ready, click <strong>Start Deduplication</strong>.</p>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Upload Titles File (Optional)</h2>
+        <p class="hint">Upload a <code>.csv</code> or <code>.xlsx</code> file where the first column contains paper titles. These will be saved as papers for this review and later enriched in the missing-abstract step.</p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload_titles_excel">
+            <input type="file" name="titles_file" accept=".csv,.xlsx" required>
+            <button type="submit">Upload Titles File</button>
+        </form>
+    </div>
+
+    <div class="card">
+        {% if search_queries %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Query Focus</th>
+                        <th>Status</th>
+                        <th>Uploaded File</th>
+                        <th>Upload RIS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for query in search_queries %}
+                        <tr>
+                            <td>{{ query.get_focus_display }}</td>
+                            <td>
+                                {% if query.ris_uploaded %}
+                                    <span class="status-pill done">Uploaded</span>
+                                {% else %}
+                                    <span class="status-pill todo">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if query.ris_file_name %}
+                                    {{ query.ris_file_name }}
+                                    <br>
+                                    <small>Imported: {{ query.imported_records }}, Missing abstracts: {{ query.missing_abstracts }}</small>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post" enctype="multipart/form-data">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="upload">
+                                    <input type="hidden" name="search_query_id" value="{{ query.id }}">
+                                    <input type="file" name="ris_file" accept=".ris" required>
+                                    <button type="submit">Upload</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <form method="post" style="margin-top: 1rem;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="start_dedupe">
+                <button type="submit" class="btn-dedupe">Start Deduplication</button>
+                <p class="hint">You can start dedupe after 1, 2, 3, or 4 uploads.</p>
+            </form>
+        {% else %}
+            <p>No generated queries found yet. Generate search strategy first.</p>
+        {% endif %}
+    </div>
+
+    {% if report %}
+        <div class="card report">
+            <h2>Data Quality Report</h2>
+            <p>Total Papers Imported: {{ report.total_papers_imported }}</p>
+            <p>Duplicates Removed: {{ report.duplicates_removed }}</p>
+            <p>Papers missing Abstracts (Flagged): {{ report.missing_abstracts_flagged }}</p>
+        </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

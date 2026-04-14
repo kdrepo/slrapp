@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Confirm Formalized Parameters</title>
+    <style>
+        :root {
+            --bg: #f0f7f6;
+            --ink: #0f172a;
+            --card: #ffffff;
+            --accent: #0a7e6f;
+            --line: #c8d8d6;
+        }
+        body {
+            margin: 0;
+            font-family: "Trebuchet MS", Verdana, sans-serif;
+            background: linear-gradient(145deg, #dff2f0 0%, #f0f7f6 55%, #e7f0fb 100%);
+            color: var(--ink);
+        }
+        .wrap {
+            max-width: 980px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+        }
+        h1, h2, h3 { margin-top: 0; }
+        label {
+            display: block;
+            margin: 0.35rem 0;
+            font-weight: 700;
+        }
+        input, textarea, select, button {
+            font: inherit;
+        }
+        input, textarea, select {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #9fb8b5;
+            border-radius: 7px;
+            padding: 0.6rem;
+            margin-bottom: 0.8rem;
+            background: #fff;
+        }
+        .rq-row {
+            padding: 0.8rem;
+            border: 1px dashed #a8c0bd;
+            border-radius: 8px;
+            margin-bottom: 0.8rem;
+            background: #f7fcfb;
+        }
+        .errorlist { color: #9f1239; margin: 0.25rem 0 0.6rem; }
+        .actions {
+            display: flex;
+            gap: 0.7rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn-primary {
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #fff;
+            padding: 0.75rem 1.3rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .small {
+            color: #334155;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <h1>Phase 2: Confirm AI-Formalized Parameters</h1>
+    <p class="small">Review: <strong>{{ review.title }}</strong>. Edit inline, then confirm to lock and move status to <code>running</code>.</p>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        {{ rq_formset.management_form }}
+
+        <section class="card">
+            <h2>Research Questions</h2>
+            {% for form in rq_formset %}
+                <div class="rq-row">
+                    <h3>RQ {{ forloop.counter }}</h3>
+                    {{ form.id }}
+                    {{ form.question_text.label_tag }}
+                    {{ form.question_text }}
+                    {{ form.question_text.errors }}
+                    {{ form.type.label_tag }}
+                    {{ form.type }}
+                    {{ form.type.errors }}
+                    {% if form.DELETE %}
+                        <label>{{ form.DELETE }} Delete this RQ</label>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            {% if rq_formset.non_form_errors %}
+                {{ rq_formset.non_form_errors }}
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <h2>Refined PICO</h2>
+            {{ review_form.pico_population.label_tag }}
+            {{ review_form.pico_population }}
+            {{ review_form.pico_population.errors }}
+            {{ review_form.pico_intervention.label_tag }}
+            {{ review_form.pico_intervention }}
+            {{ review_form.pico_intervention.errors }}
+            {{ review_form.pico_comparison.label_tag }}
+            {{ review_form.pico_comparison }}
+            {{ review_form.pico_comparison.errors }}
+            {{ review_form.pico_outcomes.label_tag }}
+            {{ review_form.pico_outcomes }}
+            {{ review_form.pico_outcomes.errors }}
+        </section>
+
+        <section class="card">
+            <h2>Refined Criteria</h2>
+            {{ review_form.inclusion_criteria.label_tag }}
+            {{ review_form.inclusion_criteria }}
+            {{ review_form.inclusion_criteria.errors }}
+            {{ review_form.exclusion_criteria.label_tag }}
+            {{ review_form.exclusion_criteria }}
+            {{ review_form.exclusion_criteria.errors }}
+        </section>
+
+        <div class="actions">
+            <button class="btn-primary" type="submit">Confirm &amp; Lock</button>
+            <a href="{% url 'reviews:review-detail' review.pk %}">Review</a> |
+            <a href="{% url 'reviews:review-confirm' review.pk %}">Confirm Parameters</a> |
+            <a href="{% url 'reviews:search-strategy' review.pk %}">Search Strategy</a> |
+            <a href="{% url 'reviews:ris-upload' review.pk %}">RIS Upload</a> |
+            <a href="{% url 'reviews:screening-dashboard' review.pk %}">Screening Dashboard</a> |
+            <a href="{% url 'reviews:screening-decisions' review.pk %}">All Decisions</a> |
+            <a href="{% url 'reviews:screening-conflicts' review.pk %}">Conflicts</a> |
+            <a href="{% url 'reviews:screening-export' review.pk %}">Export / Import JSON</a> |
+            <a href="{% url 'reviews:fulltext-upload-window' review.pk %}">Upload Window</a> |
+            <a href="{% url 'reviews:fulltext-retrieval-monitor' review.pk %}">Full-Text Monitor</a>
+        </div>
+    </form>
+
+</div>
+</body>
+</html>
+
+
+

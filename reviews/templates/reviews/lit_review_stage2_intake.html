@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Literature Review - Stage 2 Intake</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d6deea; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+        .stats { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+        .pill { border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.3rem 0.7rem; background: #f8fafc; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        button { border: 0; border-radius: 7px; padding: 0.5rem 0.8rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        input[type="file"] { width: 100%; margin-bottom: 0.6rem; }
+        .topnav { background: #0f172a; color: #dbeafe; padding: 0.8rem 1rem; }
+        .topnav a { color: #bfdbfe; text-decoration: none; font-weight: 600; margin-right: 0.9rem; }
+    </style>
+</head>
+<body>
+<div class="topnav">
+    <strong>Literature Review App</strong>
+    <a href="/lit/">Stage 1</a>
+    <a href="{% url 'lit_reviews:stage1-detail' lit_review.pk %}">Stage 1 Output</a>
+    <a href="{% url 'lit_reviews:stage3-mineru-monitor' lit_review.pk %}">Stage 3 MinerU</a>
+    <a href="{% url 'lit_reviews:stage4-extraction-monitor' lit_review.pk %}">Stage 4 Extraction</a>
+    <a href="{% url 'lit_reviews:stage4b-assignment-monitor' lit_review.pk %}">Stage 4b Assignment</a>
+    <a href="{% url 'lit_reviews:stage5-writing-monitor' lit_review.pk %}">Stage 5a Writing</a>
+    <a href="{% url 'lit_reviews:stage5b-stitch-monitor' lit_review.pk %}">Stage 5b Stitching</a>
+</div>
+<div class="wrap">
+    <div class="card">
+        <h1>Stage 2 Intake (Custom Sources)</h1>
+        <p><strong>Review:</strong> {{ lit_review.research_question }}</p>
+        <div class="stats">
+            <span class="pill">Total Papers: {{ stats.total }}</span>
+            <span class="pill">RIS: {{ stats.ris }}</span>
+            <span class="pill">Excel: {{ stats.excel }}</span>
+            <span class="pill">PDF Retrieved: {{ stats.retrieved }}</span>
+            <span class="pill">Pending PDF: {{ stats.pending_pdf }}</span>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="grid">
+        <div class="card">
+            <h2>1. Upload RIS</h2>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_ris">
+                <input type="file" name="ris_file" accept=".ris" required>
+                <button type="submit">Import RIS</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>2. Upload Excel (Title + PDF Link)</h2>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_excel">
+                <input type="file" name="excel_file" accept=".xlsx,.xlsm,.xltx,.xltm" required>
+                <button type="submit">Import Excel</button>
+            </form>
+            <p>Expected columns: <code>title</code> and <code>pdf_link</code>.</p>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>3. Upload Numbered PDFs</h2>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_numbered_pdfs">
+                <input type="file" name="pdf_files" accept="application/pdf" multiple required>
+                <button type="submit">Attach Numbered PDFs</button>
+            </form>
+            <p>Use filenames like <code>1.pdf</code>, <code>2.pdf</code> matching Excel row index.</p>
+        </div>
+
+        <div class="card">
+            <h2>4. Download PDFs from Links</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="download_links">
+                <button type="submit">Download Missing PDFs</button>
+            </form>
+            <p>This tries each paper's <code>pdf_link</code> first, then <code>url</code>.</p>
+            <hr style="margin:1rem 0;border:0;border-top:1px solid #d8e2ea;">
+            <h3 style="margin-top:0;">5. Resolve Missing PDFs (Semantic/Crossref/Elsevier/OA)</h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="resolve_missing_pdfs">
+                <button type="submit">Resolve + Download Missing PDFs</button>
+            </form>
+            <p>This searches metadata sources for missing DOI/open links, then tries direct PDF, Elsevier, and Unpaywall.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>6. Upload PDFs and Extract Titles (Verification)</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload_extract_titles">
+            <input type="file" name="title_extract_pdf_files" accept="application/pdf" multiple required>
+            <button type="submit">Extract Titles from Uploaded PDFs</button>
+        </form>
+        <p>After extraction, verify/edit titles and save selected rows as LR papers.</p>
+    </div>
+
+    {% if title_extract_stage.rows %}
+    <div class="card">
+        <h2>Extracted Titles (Verify Before Save)</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="confirm_extracted_titles">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Include</th>
+                        <th>Original File</th>
+                        <th>Extracted Title</th>
+                        <th>Verified Title (Editable)</th>
+                        <th>Status</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in title_extract_stage.rows %}
+                        <tr>
+                            <td>
+                                {% if row.status == 'ready' %}
+                                    <input type="checkbox" name="include_{{ row.row_id }}" checked>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ row.original_name|default:"-" }}</td>
+                            <td>{{ row.extracted_title|default:"-" }}</td>
+                            <td>
+                                {% if row.status == 'ready' %}
+                                    <input type="text" name="verified_title_{{ row.row_id }}" value="{{ row.extracted_title }}" style="width:100%; max-width:500px;">
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ row.status }}</td>
+                            <td>{{ row.error|default:"-" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div style="margin-top:0.75rem;">
+                <button type="submit">Save Verified Titles to LR Papers</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>7. Generate APA Citations (DeepSeek)</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="generate_apa_citations">
+            <label style="display:inline-block; margin-right:0.6rem;">
+                <input type="radio" name="only_missing" value="1" checked> Only missing citations
+            </label>
+            <label style="display:inline-block; margin-right:0.9rem;">
+                <input type="radio" name="only_missing" value="0"> Regenerate all citations
+            </label>
+            <button type="submit">Generate APA Citations</button>
+        </form>
+        <p>
+            Status: <strong id="citation-status">{{ citation_stage.status|default:"idle" }}</strong> |
+            Targeted: <strong id="citation-targeted">{{ citation_stage.targeted|default:0 }}</strong> |
+            Processed: <strong id="citation-processed">{{ citation_stage.processed|default:0 }}</strong> |
+            Done: <strong id="citation-done">{{ citation_stage.done|default:0 }}</strong> |
+            Failed: <strong id="citation-failed">{{ citation_stage.failed|default:0 }}</strong>
+        </p>
+        <p id="citation-error" style="color:#b91c1c;"></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Citation Source</th>
+                    <th>Title</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="citation-logs-body">
+                {% for row in citation_stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id|default:"-" }}</td>
+                        <td>{{ row.citation_source|default:"-" }}</td>
+                        <td>{{ row.title|default:"-" }}</td>
+                        <td>{% if row.error_code %}{{ row.error_code }}: {% endif %}{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">No citation events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Live Resolver Status</h2>
+        <p>
+            Status: <strong id="resolver-status">{{ resolver_stage.status|default:"idle" }}</strong> |
+            Targeted: <strong id="resolver-targeted">{{ resolver_stage.targeted|default:0 }}</strong> |
+            Processed: <strong id="resolver-processed">{{ resolver_stage.processed|default:0 }}</strong> |
+            Resolved: <strong id="resolver-resolved">{{ resolver_stage.resolved|default:0 }}</strong> |
+            Downloaded: <strong id="resolver-downloaded">{{ resolver_stage.downloaded|default:0 }}</strong> |
+            Failed: <strong id="resolver-failed">{{ resolver_stage.failed|default:0 }}</strong>
+        </p>
+        <p id="resolver-error" style="color:#b91c1c;"></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Source</th>
+                    <th>Title</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="resolver-logs-body">
+                {% for row in resolver_stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id|default:"-" }}</td>
+                        <td>{{ row.source|default:"-" }}</td>
+                        <td>{{ row.title|default:"-" }}</td>
+                        <td>{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">No resolver events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Excel Papers Table</h2>
+        <form method="get" style="margin-bottom:0.75rem;">
+            <label for="excel_pdf_status">PDF status:</label>
+            <select id="excel_pdf_status" name="excel_pdf_status" style="margin-right:0.75rem;">
+                <option value="all" {% if excel_pdf_status == 'all' %}selected{% endif %}>All</option>
+                <option value="downloaded" {% if excel_pdf_status == 'downloaded' %}selected{% endif %}>Downloaded</option>
+                <option value="missing" {% if excel_pdf_status == 'missing' %}selected{% endif %}>Missing</option>
+            </select>
+            <label for="excel_title_search">Title contains:</label>
+            <input id="excel_title_search" type="text" name="excel_title_search" value="{{ excel_title_search|default:'' }}" style="max-width:340px; margin-right:0.75rem;">
+            <button type="submit">Apply Filters</button>
+        </form>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Origin</th>
+                    <th>Excel Row</th>
+                    <th>Title</th>
+                    <th>DOI</th>
+                    <th>PDF Link</th>
+                    <th>Retrieved</th>
+                    <th>PDF Source</th>
+                    <th>Citation Status</th>
+                    <th>APA Citation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for paper in papers %}
+                    <tr>
+                        <td>{{ paper.id }}</td>
+                        <td>{{ paper.origin }}</td>
+                        <td>{{ paper.excel_row_index|default:"-" }}</td>
+                        <td>{{ paper.title }}</td>
+                        <td>{{ paper.doi|default:"-" }}</td>
+                        <td>
+                            {% if paper.pdf_link %}
+                                <a href="{{ paper.pdf_link }}" target="_blank" rel="noopener noreferrer">{{ paper.pdf_link }}</a>
+                            {% elif paper.url %}
+                                <a href="{{ paper.url }}" target="_blank" rel="noopener noreferrer">{{ paper.url }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ paper.fulltext_retrieved }}</td>
+                        <td>{{ paper.pdf_source|default:"-" }}</td>
+                        <td>{{ paper.citation_status|default:"-" }}</td>
+                        <td>{{ paper.citation_apa|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="10">No papers yet. Upload RIS or Excel first.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+(function () {
+    const statusUrl = "{% url 'lit_reviews:stage2-resolver-status' lit_review.pk %}";
+    const statusEl = document.getElementById('resolver-status');
+    const targetedEl = document.getElementById('resolver-targeted');
+    const processedEl = document.getElementById('resolver-processed');
+    const resolvedEl = document.getElementById('resolver-resolved');
+    const downloadedEl = document.getElementById('resolver-downloaded');
+    const failedEl = document.getElementById('resolver-failed');
+    const errorEl = document.getElementById('resolver-error');
+    const logsBody = document.getElementById('resolver-logs-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="6">No resolver events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            return '<tr>'
+                + '<td>' + (row.time || '') + '</td>'
+                + '<td>' + (row.event || '') + '</td>'
+                + '<td>' + (row.paper_id || '-') + '</td>'
+                + '<td>' + (row.source || '-') + '</td>'
+                + '<td>' + (row.title || '-') + '</td>'
+                + '<td>' + (row.error_message || '-') + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function isTerminal(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error' || status === 'idle';
+    }
+
+    let timer = null;
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.status || 'idle';
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                resolvedEl.textContent = data.resolved || 0;
+                downloadedEl.textContent = data.downloaded || 0;
+                failedEl.textContent = data.failed || 0;
+                if (data.status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+                renderLogs(data.logs || []);
+
+                if (isTerminal(data.status) && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Resolver status polling failed. Retrying...';
+            });
+    }
+
+    poll();
+    timer = setInterval(poll, 2500);
+})();
+</script>
+<script>
+(function () {
+    const statusUrl = "{% url 'lit_reviews:stage2-citation-status' lit_review.pk %}";
+    const statusEl = document.getElementById('citation-status');
+    const targetedEl = document.getElementById('citation-targeted');
+    const processedEl = document.getElementById('citation-processed');
+    const doneEl = document.getElementById('citation-done');
+    const failedEl = document.getElementById('citation-failed');
+    const errorEl = document.getElementById('citation-error');
+    const logsBody = document.getElementById('citation-logs-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="6">No citation events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            const errorText = (row.error_code ? (row.error_code + ': ') : '') + (row.error_message || '-');
+            return '<tr>'
+                + '<td>' + (row.time || '') + '</td>'
+                + '<td>' + (row.event || '') + '</td>'
+                + '<td>' + (row.paper_id || '-') + '</td>'
+                + '<td>' + (row.citation_source || '-') + '</td>'
+                + '<td>' + (row.title || '-') + '</td>'
+                + '<td>' + errorText + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function isTerminal(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error' || status === 'idle';
+    }
+
+    let timer = null;
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.status || 'idle';
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+                if (data.status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+                renderLogs(data.logs || []);
+
+                if (isTerminal(data.status) && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Citation status polling failed. Retrying...';
+            });
+    }
+
+    poll();
+    timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

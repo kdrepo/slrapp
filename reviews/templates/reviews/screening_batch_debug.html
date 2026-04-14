@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Gemini Batch Debug | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f5f8fb; color: #1f2937; }
+        .wrap { max-width: 1040px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.55rem 0.9rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        button.secondary { background: #475569; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.65rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .mono { font-family: Consolas, "Courier New", monospace; font-size: 0.9rem; white-space: pre-wrap; }
+        .banner { padding: 0.7rem 0.9rem; border-radius: 8px; margin-top: 0.8rem; border: 1px solid #cbd5e1; background: #f8fafc; }
+        .ok { background: #ecfdf5; border-color: #86efac; }
+        .warn { background: #fffbeb; border-color: #fcd34d; }
+        .err { background: #fef2f2; border-color: #fca5a5; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Gemini Batch Debug (5 Papers)</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p>Flow: click Start -> submit exactly 5 eligible papers -> background poll command ingests -> this page refreshes status.</p>
+        <button id="start-btn" type="button">Start 5-Paper Batch</button>
+        <button id="force-poll-btn" class="secondary" type="button">Force Poll Once (Debug)</button>
+        <div id="ui-status" class="banner">Ready. Click Start to begin.</div>
+    </div>
+
+    <div class="card">
+        <h2>Live State</h2>
+        <p id="summary">Waiting...</p>
+        <div class="mono" id="phase-data"></div>
+    </div>
+
+    <div class="card">
+        <h2>Papers in This Debug Batch</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Decision</th>
+                    <th>Confidence</th>
+                    <th>Conflict</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody id="papers-body">
+                <tr><td colspan="6">No data yet.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+const startUrl = "{% url 'reviews:screening-batch-debug-start' review.pk %}";
+const statusUrl = "{% url 'reviews:screening-batch-debug-status' review.pk %}";
+const forcePollUrl = "{% url 'reviews:screening-batch-debug-force-poll' review.pk %}";
+
+function logStep(step, payload) {
+    console.log(`[BatchDebug] ${step}`, payload || {});
+}
+
+function setUiStatus(message, type) {
+    const node = document.getElementById('ui-status');
+    node.className = `banner ${type || ''}`.trim();
+    node.innerText = message;
+}
+
+function getCsrfToken() {
+    const match = document.cookie.match(/csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+function renderSnapshot(snapshot) {
+    const summary = document.getElementById('summary');
+    const phaseData = document.getElementById('phase-data');
+    const body = document.getElementById('papers-body');
+
+    summary.innerText = `Total: ${snapshot.total} | Decided: ${snapshot.decided} | Pending: ${snapshot.pending}`;
+    phaseData.innerText = JSON.stringify({stage: snapshot.stage, polling: snapshot.polling}, null, 2);
+
+    if (!snapshot.papers || snapshot.papers.length === 0) {
+        body.innerHTML = '<tr><td colspan="6">No papers are attached to the debug batch yet.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = snapshot.papers.map((paper) => `
+        <tr>
+            <td>${paper.id}</td>
+            <td>${paper.title || ''}</td>
+            <td>${paper.ta_decision || '(pending)'}</td>
+            <td>${paper.ta_confidence ?? ''}</td>
+            <td>${paper.screening_conflict ? 'Yes' : 'No'}</td>
+            <td>${paper.ta_reason || ''}</td>
+        </tr>
+    `).join('');
+}
+
+async function refreshStatus() {
+    try {
+        logStep('status.request.start');
+        const response = await fetch(statusUrl);
+        const data = await response.json();
+        logStep('status.response.received', data);
+        if (data.ok) {
+            renderSnapshot(data.snapshot);
+        }
+    } catch (err) {
+        logStep('status.request.error', {error: String(err)});
+        setUiStatus(`Status refresh failed: ${err}`, 'err');
+    }
+}
+
+async function startBatch() {
+    const startBtn = document.getElementById('start-btn');
+    startBtn.disabled = true;
+    setUiStatus('Process started. Preparing and submitting batch...', 'warn');
+
+    try {
+        logStep('start.request.start');
+        const response = await fetch(startUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() },
+        });
+        const data = await response.json();
+        logStep('start.response.received', data);
+
+        if (data.ok && data.step === 'submitted') {
+            setUiStatus(`Process started. Batch submitted for ${data.result.request_count} papers.`, 'ok');
+        } else if (data.ok && data.step === 'no_eligible_papers') {
+            setUiStatus('No eligible papers found (need NOT_PROCESSED/NULL decision + non-empty abstract).', 'warn');
+        } else {
+            setUiStatus(`Batch start failed: ${data.error || 'Unknown error'}`, 'err');
+        }
+
+        await refreshStatus();
+    } catch (err) {
+        logStep('start.request.error', {error: String(err)});
+        setUiStatus(`Batch start failed: ${err}`, 'err');
+    } finally {
+        startBtn.disabled = false;
+    }
+}
+
+async function forcePoll() {
+    setUiStatus('Running manual poll...', 'warn');
+
+    try {
+        logStep('force_poll.request.start');
+        const response = await fetch(forcePollUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() },
+        });
+        const data = await response.json();
+        logStep('force_poll.response.received', data);
+
+        if (data.ok) {
+            setUiStatus(`Manual poll complete. State: ${data.result.state || 'unknown'}`, 'ok');
+        } else {
+            setUiStatus(`Manual poll failed: ${data.error || 'Unknown error'}`, 'err');
+        }
+
+        await refreshStatus();
+    } catch (err) {
+        logStep('force_poll.request.error', {error: String(err)});
+        setUiStatus(`Manual poll failed: ${err}`, 'err');
+    }
+}
+
+document.getElementById('start-btn').addEventListener('click', startBatch);
+document.getElementById('force-poll-btn').addEventListener('click', forcePoll);
+
+logStep('page.init');
+refreshStatus();
+setInterval(refreshStatus, 7000);
+</script>
+</body>
+</html>
+
+
+

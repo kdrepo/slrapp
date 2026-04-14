@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scaffold Editor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        textarea { width: 100%; min-height: 180px; font-family: Consolas, monospace; font-size: 13px; }
+        input[type="text"] { width: 100%; padding: 8px; }
+        .row { margin-bottom: 12px; }
+        .error { color: #a40000; }
+        .success { color: #0c6b2f; }
+        .muted { color: #666; }
+        .nav a { margin-right: 10px; }
+        button { padding: 8px 14px; cursor: pointer; }
+        .button-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="container">
+    <h1>Scaffold Editor</h1>
+    <p class="muted">Review {{ review.id }}: {{ review.title }}</p>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <div class="{% if message.tags == 'error' %}error{% else %}success{% endif %}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if errors %}
+        <div class="card">
+            <h3>Validation Errors</h3>
+            {% for err in errors %}
+                <div class="error">- {{ err }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="post" class="card" style="margin-bottom: 12px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="populate_all_now">
+        <h3>Add Available Components From Existing Data</h3>
+        <p class="muted">These buttons auto-fill scaffold_data keys we can build now from your current review/paper records.</p>
+        <div class="button-row">
+            <button type="submit">Add All Available Items</button>
+        </div>
+        <hr>
+        <div class="button-row">
+            <button type="submit" name="action" value="populate_research_questions">Add Research Questions</button>
+            <button type="submit" name="action" value="populate_pico">Add PICO</button>
+            <button type="submit" name="action" value="populate_paper_registry">Add Paper Registry</button>
+            <button type="submit" name="action" value="populate_quality_summary">Add Quality Summary</button>
+            <button type="submit" name="action" value="populate_subgroup_data">Add Subgroup Data</button>
+            <button type="submit" name="action" value="populate_review_metadata">Add Review Metadata</button>
+        </div>
+    </form>
+
+    <form method="post" class="card" style="margin-bottom: 12px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="recalculate_prisma">
+        <h3>Final PRISMA Recalculation</h3>
+        <p class="muted">This recalculates PRISMA counts from current review data and updates <code>scaffold_data.prisma_counts</code>.</p>
+        <button type="submit">Recalculate PRISMA Counts (Final)</button>
+    </form>
+
+    <form method="post" class="card" style="margin-bottom: 12px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="generate_preamble">
+        <h3>Build scaffold_preamble_template</h3>
+        <p class="muted">Generate/update preamble text from current <code>scaffold_data</code>. Use this before downstream LLM calls.</p>
+        <button type="submit">Generate Preamble From scaffold_data</button>
+    </form>
+
+    <form method="post" class="card">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+        <h3>Scaffold Data (JSON)</h3>
+        <p class="muted">Each value must be valid JSON (object, array, string in quotes, number, true/false, or null).</p>
+
+        <input type="hidden" name="entry_count" value="{{ entries|length }}">
+
+        {% for entry in entries %}
+            <div class="row">
+                <label><strong>Key</strong></label>
+                <input type="text" name="key_{{ forloop.counter0 }}" value="{{ entry.key }}">
+            </div>
+            <div class="row">
+                <label><strong>Value (JSON)</strong></label>
+                <textarea name="value_{{ forloop.counter0 }}">{{ entry.value_raw }}</textarea>
+            </div>
+            <hr>
+        {% empty %}
+            <p>No scaffold_data components yet.</p>
+        {% endfor %}
+
+        <h3>Add New Scaffold Data Component (Optional)</h3>
+        <div class="row">
+            <label><strong>New Key</strong></label>
+            <input type="text" name="new_key" placeholder="example_key">
+        </div>
+        <div class="row">
+            <label><strong>New Value (JSON)</strong></label>
+            <textarea name="new_value" placeholder='{"example": "value"}'></textarea>
+        </div>
+
+        <h3>scaffold_preamble_template (Text)</h3>
+        <div class="row">
+            <textarea name="scaffold_preamble_template">{{ preamble_text }}</textarea>
+        </div>
+
+        <div class="button-row">
+            <button type="submit">Save Scaffold Data + Preamble</button>
+        </div>
+    </form>
+
+</div>
+</body>
+</html>
+
+

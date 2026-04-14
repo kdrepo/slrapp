@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Phase 18 Dialectical Synthesis | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7f9fc; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d6dee8; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.4rem; }
+        .muted { color: #475569; font-size: 0.92rem; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Phase 18: Dialectical Synthesis</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="start">Start</button>
+            <button type="submit" name="action" value="retry">Retry</button>
+            <button type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+    <div class="card">
+        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <strong id="status">{{ stage.status|default:"idle" }}</strong></p>
+        <p id="error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Logs</h2>
+        <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Message</th><th>Error</th></tr></thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                <tr>
+                    <td>{{ row.time }}</td>
+                    <td>{{ row.event }}</td>
+                    <td>{{ row.message|default:"-" }}</td>
+                    <td>{% if row.error_code %}{{ row.error_code }}: {{ row.error_message }}{% else %}-{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No logs yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Theme Outputs</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Theme</th>
+                    <th>Grade</th>
+                    <th>Papers</th>
+                    <th>Advocate</th>
+                    <th>Critic</th>
+                    <th>Reconciled</th>
+                    <th>Preview</th>
+                </tr>
+            </thead>
+            <tbody id="themes-body">
+                {% for t in themes %}
+                <tr>
+                    <td>{{ t.theme_name_locked }}</td>
+                    <td>{{ t.evidence_grade }}</td>
+                    <td>{{ t.paper_count }}</td>
+                    <td>{% if t.advocate_notes %}Yes{% else %}No{% endif %}</td>
+                    <td>{% if t.critic_notes %}Yes{% else %}No{% endif %}</td>
+                    <td>{% if t.reconciled_text or t.reconciler_notes %}Yes{% else %}No{% endif %}</td>
+                    <td>{{ t.reconciled_text|default:t.reconciler_notes|truncatechars:200 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7">No themes available yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function(){
+  const statusUrl = "{% url 'reviews:dialectical-status' review.pk %}";
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const logsBody = document.getElementById('logs-body');
+  const themesBody = document.getElementById('themes-body');
+
+  function renderLogs(logs){
+    if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
+    logsBody.innerHTML = logs.map(l => '<tr><td>'+(l.time||'')+'</td><td>'+(l.event||'')+'</td><td>'+(l.message||'-')+'</td><td>'+((l.error_code? (l.error_code+': '+(l.error_message||'')) : '-'))+'</td></tr>').join('');
+  }
+
+  function renderThemes(themes){
+    if(!themes || !themes.length){ themesBody.innerHTML='<tr><td colspan="7">No themes available yet.</td></tr>'; return; }
+    themesBody.innerHTML = themes.map(t => {
+      return '<tr><td>'+(t.theme_name||'-')+'</td><td>'+(t.grade||'-')+'</td><td>'+(t.paper_count||0)+'</td><td>'+(t.has_advocate?'Yes':'No')+'</td><td>'+(t.has_critic?'Yes':'No')+'</td><td>'+(t.has_reconciled?'Yes':'No')+'</td><td>'+(t.reconciled_preview||'')+'</td></tr>';
+    }).join('');
+  }
+
+  function isTerminal(s){ return s==='completed' || s==='stopped' || s==='error'; }
+
+  let timer = null;
+  function poll(){
+    fetch(statusUrl).then(r=>r.json()).then(data=>{
+      statusEl.textContent = data.status || 'idle';
+      errorEl.textContent = data.status === 'error' ? ('Error ['+(data.error_code||'UnknownError')+']: '+(data.error_message||'')) : '';
+      renderLogs(data.logs || []);
+      renderThemes(data.themes || []);
+      if(isTerminal(data.status) && timer){ clearInterval(timer); timer = null; }
+    }).catch(()=>{ errorEl.textContent = 'Status polling failed. Retrying...'; });
+  }
+
+  poll();
+  timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Title/Abstract Screening | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 980px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.5rem 0.9rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+        .selector-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.35rem; margin-bottom: 0.75rem; }
+        .selector-grid label { display: flex; align-items: center; gap: 0.5rem; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Phase 7 & 8: Title/Abstract Screening (DeepSeek)</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Eligible papers in queue (NOT_PROCESSED/NULL TA + abstract present): <strong>{{ unprocessed_count }}</strong></p>
+        <p class="muted">Papers requiring conflict resolution (confidence &lt; 0.72): <strong>{{ conflicts_count }}</strong></p>
+        <p class="muted">Included papers pending full-text retrieval: <strong>{{ fulltext_pending_count }}</strong></p>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Screening Controls</h2>
+        <div class="actions">
+            <form method="post" action="{% url 'reviews:screening-start' review.pk %}">
+                {% csrf_token %}
+                <p class="muted" style="margin: 0 0 0.5rem;">Select which title-screening categories to include in abstract screening:</p>
+                <div class="selector-grid">
+                    {% for row in title_screening_option_rows %}
+                        <label>
+                            <input type="checkbox" name="title_screening_decisions" value="{{ row.value }}" {% if row.selected %}checked{% endif %}>
+                            <span>{{ row.label }} ({{ row.count }})</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                <button type="submit" name="action" value="start">Start Screening Queue</button>
+                <button type="submit" name="action" value="retry_not_done" style="margin-left:0.5rem; background:#1d4ed8;">Retry Not Done</button>
+            </form>
+            <form method="post" action="{% url 'reviews:screening-poll' review.pk %}">
+                {% csrf_token %}
+                <button type="submit">Run Poll Cycle</button>
+            </form>
+            <a href="{% url 'reviews:screening-conflicts' review.pk %}">Open Conflict Dashboard</a>
+            <a href="{% url 'reviews:screening-decisions' review.pk %}">Open All Decisions Review</a>
+            <a href="{% url 'reviews:screening-export' review.pk %}">Export JSON by Decision</a>
+            <a href="{% url 'reviews:screening-batch-debug' review.pk %}">Open 5-Paper Debug Page</a>
+            <a href="{% url 'reviews:fulltext-upload-window' review.pk %}">Open Upload Window (Full Text)</a>
+            <a href="{% url 'reviews:fulltext-retrieval-monitor' review.pk %}">Open Full-Text Live Monitor</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Stored Progress</h2>
+        <p class="muted"><strong>Auto Polling:</strong> every 60 seconds while pending.</p>
+        <p class="muted" id="autopoll-status">Auto Poll Status: Initializing...</p>
+        <p><strong>Phase 7:</strong></p>
+        <pre id="phase7-json" style="white-space: pre-wrap; font-size: 0.85rem;">{{ phase_7|default:"{}" }}</pre>
+        <p><strong>Phase 8:</strong></p>
+        <pre id="phase8-json" style="white-space: pre-wrap; font-size: 0.85rem;">{{ phase_8|default:"{}" }}</pre>
+    </div>
+
+</div>
+<script>
+(function () {
+    const statusUrl = "{% url 'reviews:screening-status' review.pk %}";
+    const pollUrl = "{% url 'reviews:screening-poll-api' review.pk %}";
+    const phase7El = document.getElementById('phase7-json');
+    const phase8El = document.getElementById('phase8-json');
+    const autoEl = document.getElementById('autopoll-status');
+    let running = false;
+    let timer = null;
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    function setAutoStatus(msg) {
+        autoEl.textContent = `Auto Poll Status: ${msg}`;
+    }
+
+    function schedule(ms) {
+        if (timer) {
+            clearTimeout(timer);
+        }
+        timer = setTimeout(tick, ms);
+    }
+
+    function isTerminal(status) {
+        return ['completed', 'error', 'stopped', 'no_eligible_papers'].includes((status || '').toLowerCase());
+    }
+
+    async function fetchStatus() {
+        const res = await fetch(statusUrl);
+        if (!res.ok) throw new Error(`status http ${res.status}`);
+        return await res.json();
+    }
+
+    async function runPollCycle() {
+        if (running) return;
+        running = true;
+        try {
+            setAutoStatus('Polling now...');
+            const res = await fetch(pollUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`poll http ${res.status} ${txt}`);
+            }
+            const body = await res.json();
+            if (!body.ok) throw new Error(body.error || 'unknown poll error');
+            setAutoStatus('Poll cycle completed.');
+        } finally {
+            running = false;
+        }
+    }
+
+    async function tick() {
+        try {
+            const status = await fetchStatus();
+            phase7El.textContent = JSON.stringify(status.phase_7 || {}, null, 2);
+            phase8El.textContent = JSON.stringify(status.phase_8 || {}, null, 2);
+
+            const phase8Status = ((status.phase_8 || {}).status || '').toLowerCase();
+            const remaining = Number(status.remaining || 0);
+            if (isTerminal(phase8Status) || remaining === 0) {
+                setAutoStatus(`Stopped (${phase8Status || 'completed'}).`);
+                return;
+            }
+
+            await runPollCycle();
+            schedule(60000);
+        } catch (err) {
+            setAutoStatus(`Error: ${err.message}. Retrying in 60s.`);
+            schedule(60000);
+        }
+    }
+
+    tick();
+})();
+</script>
+</body>
+</html>
+

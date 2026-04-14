@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Literature Review Plan</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .wrap { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d6deea; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.6rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .muted { color: #475569; }
+        .topnav { background: #0f172a; color: #dbeafe; padding: 0.8rem 1rem; }
+        .topnav a { color: #bfdbfe; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="topnav">
+    <strong>Literature Review App</strong>
+    <span style="margin-left: 1rem;"><a href="/lit/">New Stage 1 Plan</a></span>
+    <span style="margin-left: 1rem;"><a href="{% url 'lit_reviews:stage2-intake' lit_review.pk %}">Go To Stage 2 Intake</a></span>
+</div>
+<div class="wrap">
+    <div class="card">
+        <h1>Stage 1 Output</h1>
+        <p><strong>Main Research Context:</strong> {{ lit_review.research_context|default:"-" }}</p>
+        <p><strong>Primary Research Question:</strong> {{ lit_review.research_question }}</p>
+        <p><strong>All Research Questions:</strong></p>
+        <ul>
+            {% for rq in lit_review.research_questions %}
+                <li>{{ rq }}</li>
+            {% empty %}
+                <li>{{ lit_review.research_question }}</li>
+            {% endfor %}
+        </ul>
+        <p><strong>Target Words:</strong> {{ lit_review.target_word_count }}</p>
+        <p><strong>Allocated to Sections:</strong> {{ lit_review.total_words_allocated }}</p>
+        <p><strong>Review Goal:</strong> {{ lit_review.review_goal|default:"-" }}</p>
+        <p><strong>Gap Statement:</strong> {{ lit_review.gap_statement|default:"-" }}</p>
+        <p><strong>Order Rationale:</strong> {{ lit_review.section_order_rationale|default:"-" }}</p>
+    </div>
+
+    <div class="card">
+        <h2>Sections</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Word Target</th>
+                    <th>Target Papers</th>
+                    <th>Notable Authors</th>
+                    <th>Keywords</th>
+                    <th>Purpose</th>
+                    <th>Leads To</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for section in sections %}
+                    <tr>
+                        <td>{{ section.number }}</td>
+                        <td>{{ section.title }}</td>
+                        <td>{{ section.type }}</td>
+                        <td>{{ section.word_count_target }}</td>
+                        <td>{{ section.target_paper_count|default:"-" }}</td>
+                        <td>
+                            {% if section.notable_authors %}
+                                {{ section.notable_authors|join:", " }}
+                            {% else %}
+                                <span class="muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if section.search_keywords %}
+                                {{ section.search_keywords|join:", " }}
+                            {% else %}
+                                <span class="muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ section.purpose|default:"-" }}</td>
+                        <td>{{ section.leads_to|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9">No sections generated.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

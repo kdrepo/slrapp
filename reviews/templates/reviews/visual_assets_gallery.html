@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Visual Assets Gallery | {{ review.title }}</title>
+    <style>
+        body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: #f5f7fb; color: #1f2937; }
+        .header { background: #0f766e; color: #fff; padding: 0.9rem 1rem; }
+        .header a { color: #dff7f4; margin-right: 0.8rem; text-decoration: none; font-weight: 600; }
+        .layout { display: grid; grid-template-columns: 260px 1fr 260px; gap: 0.9rem; padding: 1rem; min-height: calc(100vh - 90px); }
+        .panel { background: #fff; border: 1px solid #dce5ef; border-radius: 10px; padding: 0.8rem; overflow: auto; }
+        .menu-title { margin: 0 0 0.6rem 0; font-size: 1.05rem; }
+        .menu { list-style: none; padding: 0; margin: 0; }
+        .menu li { margin: 0 0 0.45rem 0; }
+        .menu a { display: block; padding: 0.5rem; border-radius: 8px; text-decoration: none; color: #1e3a5f; background: #f4f8fd; border: 1px solid #d9e5f2; font-size: 0.92rem; }
+        .menu a.active { background: #dff3ef; border-color: #8dd3c8; color: #0f5f58; font-weight: 700; }
+        .embed-card { background: #fff; border: 1px solid #dce5ef; border-radius: 10px; padding: 0.5rem; display: flex; flex-direction: column; min-height: 700px; }
+        .embed-title { margin: 0.2rem 0 0.6rem 0.2rem; font-size: 0.95rem; color: #334155; }
+        iframe { width: 100%; height: 100%; min-height: 640px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+        .empty { color: #64748b; font-style: italic; padding: 0.6rem; }
+        @media (max-width: 1200px) {
+            .layout { grid-template-columns: 220px 1fr 220px; }
+        }
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+            .embed-card { min-height: 560px; }
+            iframe { min-height: 500px; }
+        }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+    <div class="header">
+        <div><strong>Visual Assets Gallery</strong> | {{ review.title }}</div>
+        <div style="margin-top:0.35rem;">
+            <a href="{% url 'reviews:visual-assets-monitor' review.pk %}">Visual Monitor</a>
+            <a href="{% url 'reviews:visual-assets-gallery' review.pk %}">Gallery</a>
+            <a href="{% url 'reviews:ghostwriter-monitor' review.pk %}">Ghostwriter</a>
+            <a href="{% url 'reviews:review-detail' review.pk %}">Review Home</a>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div class="panel">
+            <h3 class="menu-title">Tables</h3>
+            <ul class="menu">
+                {% for f in table_files %}
+                <li>
+                    <a href="?type=table&asset={{ f.embed_url|urlencode }}" class="{% if selected_type == 'table' and selected_asset == f.embed_url %}active{% endif %}">
+                        {{ f.name }}
+                    </a>
+                </li>
+                {% empty %}
+                <li class="empty">No generated table HTML files found.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="embed-card">
+            <div class="embed-title">
+                {% if selected_name %}Showing: {{ selected_name }}{% else %}No asset selected{% endif %}
+            </div>
+            {% if selected_asset %}
+                <iframe src="{{ selected_asset }}"></iframe>
+            {% else %}
+                <div class="empty">No generated HTML assets found yet. Run generation from Visual Monitor first.</div>
+            {% endif %}
+        </div>
+
+        <div class="panel">
+            <h3 class="menu-title">Figures</h3>
+            <ul class="menu">
+                {% for f in figure_files %}
+                <li>
+                    <a href="?type=figure&asset={{ f.embed_url|urlencode }}" class="{% if selected_type == 'figure' and selected_asset == f.embed_url %}active{% endif %}">
+                        {{ f.name }}
+                    </a>
+                </li>
+                {% empty %}
+                <li class="empty">No generated figure HTML files found.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

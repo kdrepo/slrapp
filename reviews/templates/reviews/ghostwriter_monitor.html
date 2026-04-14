@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 23 Ghostwriter | {{ review.title }}</title>
+  <style>
+    body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7f9fc; color: #1f2937; }
+    .wrap { max-width: 1280px; margin: 2rem auto; padding: 0 1rem; }
+    .card { background: #fff; border: 1px solid #d6dee8; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #d8e2ea; padding: 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #eff5fa; }
+    button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.4rem; }
+    .danger { background: #b91c1c; }
+    .muted { color: #475569; font-size: 0.92rem; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+  <div class="card">
+    <h1>Phase 23: Ghostwriter</h1>
+    <p>Review: <strong>{{ review.title }}</strong></p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" name="action" value="write_next">Write Next Step</button>
+      <button type="submit" name="action" value="write_all">Write All Remaining</button>
+      <button type="submit" name="action" value="retry_failed">Retry Failed</button>
+      <button type="submit" class="danger" name="action" value="stop">Stop</button>
+    </form>
+  </div>
+
+  {% if messages %}
+  <div class="card">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>
+  {% endif %}
+
+  <div class="card">
+    <p>Status: <strong id="status">{{ stage.status|default:"idle" }}</strong></p>
+    <p id="error" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h2>Section-by-Section Writing</h2>
+    <table>
+      <thead><tr><th>Section</th><th>Status</th><th>Words</th><th>Updated</th><th>Error</th><th>Action</th><th>Preview</th></tr></thead>
+      <tbody id="sections-body">
+      {% for s in sections %}
+        <tr>
+          <td>{{ s.name }}</td>
+          <td>{{ s.status }}</td>
+          <td>{{ s.word_count }}</td>
+          <td>{{ s.updated_at|default:'-' }}</td>
+          <td>{{ s.error|default:'-' }}</td>
+          <td>
+            <form method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="write_section">
+              <input type="hidden" name="section_key" value="{{ s.key }}">
+              <button type="submit">Write/Retry</button>
+            </form>
+          </td>
+          <td>{{ s.text_preview }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7">No section state yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Live Logs</h2>
+    <table>
+      <thead><tr><th>Time</th><th>Event</th><th>Message</th><th>Error</th></tr></thead>
+      <tbody id="logs-body">
+      {% for row in stage.logs %}
+        <tr>
+          <td>{{ row.time }}</td>
+          <td>{{ row.event }}</td>
+          <td>{{ row.message|default:'-' }}</td>
+          <td>{% if row.error_code %}{{ row.error_code }}: {{ row.error_message }}{% else %}-{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">No logs yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Compiled Draft</h2>
+    <pre id="compiled">{{ stage.compiled_draft }}</pre>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const statusUrl = "{% url 'reviews:ghostwriter-status' review.pk %}";
+  const monitorUrl = "{% url 'reviews:ghostwriter-monitor' review.pk %}";
+  const csrfToken = "{{ csrf_token }}";
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const logsBody = document.getElementById('logs-body');
+  const sectionsBody = document.getElementById('sections-body');
+  const compiledEl = document.getElementById('compiled');
+
+  function renderLogs(logs){
+    if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
+    logsBody.innerHTML = logs.map(l => '<tr><td>'+(l.time||'')+'</td><td>'+(l.event||'')+'</td><td>'+(l.message||'-')+'</td><td>'+((l.error_code? (l.error_code+': '+(l.error_message||'')) : '-'))+'</td></tr>').join('');
+  }
+
+  function renderSections(rows){
+    if(!rows || !rows.length){ sectionsBody.innerHTML='<tr><td colspan="7">No section state yet.</td></tr>'; return; }
+    sectionsBody.innerHTML = rows.map(s => {
+      const action = '<form method="post" action="'+monitorUrl+'" style="display:inline;">'
+        + '<input type="hidden" name="csrfmiddlewaretoken" value="'+csrfToken+'">'
+        + '<input type="hidden" name="action" value="write_section">'
+        + '<input type="hidden" name="section_key" value="'+(s.key||'')+'">'
+        + '<button type="submit">Write/Retry</button>'
+        + '</form>';
+      return '<tr><td>'+ (s.name||'') +'</td><td>'+ (s.status||'pending') +'</td><td>'+ (s.word_count||0) +'</td><td>'+ (s.updated_at||'-') +'</td><td>'+ (s.error||'-') +'</td><td>'+action+'</td><td>'+ (s.text_preview||'') +'</td></tr>';
+    }).join('');
+  }
+
+  function isTerminal(s){ return s==='completed' || s==='stopped' || s==='error' || s==='idle'; }
+
+  let timer = null;
+  function poll(){
+    fetch(statusUrl).then(r=>r.json()).then(data=>{
+      statusEl.textContent = data.status || 'idle';
+      errorEl.textContent = data.status === 'error' ? ('Error ['+(data.error_code||'UnknownError')+']: '+(data.error_message||'')) : '';
+      renderLogs(data.logs || []);
+      renderSections(data.sections_ordered || []);
+      compiledEl.textContent = data.compiled_draft || '';
+      if(isTerminal(data.status) && timer){ clearInterval(timer); timer = null; }
+    }).catch(()=>{ errorEl.textContent = 'Status polling failed. Retrying...'; });
+  }
+
+  poll();
+  timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

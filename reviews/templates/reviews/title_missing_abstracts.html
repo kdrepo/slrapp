@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Phase 6 Missing Abstracts | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f8fafc; color: #111827; }
+        .wrap { max-width: 1180px; margin: 1.5rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #dbe2ea; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.5rem; }
+        .btn { border: 0; border-radius: 8px; background: #0f766e; color: #fff; font-weight: 700; padding: 0.5rem 0.85rem; cursor: pointer; }
+        .btn.stop { background: #b91c1c; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dde5ee; padding: 0.6rem; text-align: left; vertical-align: top; }
+        th { background: #eef4fb; }
+        .ok { color: #166534; font-weight: 700; }
+        .bad { color: #b91c1c; font-weight: 700; }
+        .actions { margin-top: .75rem; display:flex; gap:.5rem; flex-wrap:wrap; }
+        .status-pill { display:inline-block; padding:0.2rem .6rem; border-radius:999px; background:#dbeafe; color:#1d4ed8; font-weight:700; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+    <div class="wrap">
+        <div class="card">
+            <h1>Phase 6: Missing Abstract Recovery (Scopus API)</h1>
+            <p class="muted">Select title-screening categories, review papers missing abstracts, then run Scopus enrichment to update abstract and metadata.</p>
+            <form method="get">
+                <div class="grid">
+                    {% for row in decision_rows %}
+                        <label>
+                            <input type="checkbox" name="title_screening_decisions" value="{{ row.value }}" {% if row.selected %}checked{% endif %}>
+                            <span>{{ row.label }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                <div class="actions">
+                    <button class="btn" type="submit">Show Missing Abstract Papers</button>
+                </div>
+            </form>
+            <p class="muted" style="margin-top:0.5rem;">Papers shown: <strong>{{ papers|length }}</strong></p>
+        </div>
+
+        {% if probe_row %}
+            <div class="card">
+                <h2>Single-Paper Probe (Auto)</h2>
+                <p class="muted">First paper in current filtered list is probed to confirm live API response shape before bulk update.</p>
+                <p><strong>Paper {{ probe_row.paper_id }}:</strong> {{ probe_row.title }}</p>
+                <p>Status: {% if probe_row.ok %}<span class="ok">OK</span>{% else %}<span class="bad">FAILED</span>{% endif %} | Source: {{ probe_row.source }} | HTTP: {{ probe_row.status_code|default:'-' }}</p>
+                {% if probe_row.error %}<p class="bad">Error: {{ probe_row.error }}</p>{% endif %}
+            </div>
+        {% endif %}
+
+        {% if messages %}
+            <div class="card">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="card">
+            <h2>Run Recovery</h2>
+            <p>Status: <span id="status" class="status-pill">{{ stage.status|default:'idle' }}</span></p>
+            <p class="muted">Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Done: <strong id="done">{{ stage.done|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong> | Pending: <strong id="pending">{{ stage.pending|default:0 }}</strong></p>
+            <p id="error" class="muted"></p>
+            <form method="post" class="actions">
+                {% csrf_token %}
+                {% for value in selected_decisions %}
+                    <input type="hidden" name="title_screening_decisions" value="{{ value }}">
+                {% endfor %}
+                <button class="btn" type="submit" name="action" value="start">Get Missing Abstracts</button>
+                <button class="btn stop" type="submit" name="action" value="stop">Stop</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Live Events</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Event</th>
+                        <th>Paper ID</th>
+                        <th>Title</th>
+                        <th>HTTP</th>
+                        <th>Source</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-body">
+                    {% for row in stage.logs %}
+                        <tr>
+                            <td>{{ row.time }}</td>
+                            <td>{{ row.event }}</td>
+                            <td>{{ row.paper_id|default:'-' }}</td>
+                            <td>{{ row.title|default:'-' }}</td>
+                            <td>{{ row.status_code|default:'-' }}</td>
+                            <td>{{ row.source|default:'-' }}</td>
+                            <td>{{ row.message|default:'-' }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7">No events yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Current Filter: Missing-Abstract Papers</h2>
+            {% if papers %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Paper ID</th>
+                            <th>Title</th>
+                            <th>Title Screening Decision</th>
+                            <th>DOI</th>
+                            <th>Scopus ID</th>
+                            <th>Journal</th>
+                            <th>Year</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for paper in papers %}
+                            <tr>
+                                <td>{{ paper.id }}</td>
+                                <td>{{ paper.title }}</td>
+                                <td>{{ paper.title_screening_decision }}</td>
+                                <td>{{ paper.doi|default:'-' }}</td>
+                                <td>{{ paper.scopus_id|default:'-' }}</td>
+                                <td>{{ paper.journal|default:'-' }}</td>
+                                <td>{{ paper.publication_year|default:'-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No papers match this filter with missing abstracts.</p>
+            {% endif %}
+        </div>
+
+        {% if last_summary.rows %}
+            <div class="card">
+                <h2>Last Run Summary</h2>
+                <p class="muted">Targeted: {{ last_summary.targeted|default:0 }} | Updated: {{ last_summary.updated|default:0 }} | Abstract Filled: {{ last_summary.abstract_filled|default:0 }} | Failed: {{ last_summary.failed|default:0 }}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Paper ID</th>
+                            <th>Status</th>
+                            <th>Source</th>
+                            <th>HTTP</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in last_summary.rows %}
+                            <tr>
+                                <td>{{ row.paper_id|default:'-' }}</td>
+                                <td>{{ row.status }}</td>
+                                <td>{{ row.source|default:'-' }}</td>
+                                <td>{{ row.status_code|default:'-' }}</td>
+                                <td>{{ row.message }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+<script>
+(function () {
+    const statusUrl = "{% url 'reviews:title-missing-abstracts-status' review.pk %}";
+    const statusEl = document.getElementById('status');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const doneEl = document.getElementById('done');
+    const failedEl = document.getElementById('failed');
+    const pendingEl = document.getElementById('pending');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="7">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            return '<tr>' +
+                '<td>' + (row.time || '') + '</td>' +
+                '<td>' + (row.event || '') + '</td>' +
+                '<td>' + (row.paper_id || '-') + '</td>' +
+                '<td>' + (row.title || '-') + '</td>' +
+                '<td>' + (row.status_code || '-') + '</td>' +
+                '<td>' + (row.source || '-') + '</td>' +
+                '<td>' + (row.message || '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function isTerminal(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error' || status === 'idle';
+    }
+
+    let timer = null;
+    function stopPolling() {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    }
+    function scheduleNext(ms) {
+        stopPolling();
+        timer = setTimeout(poll, ms);
+    }
+
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                const status = data.status || 'idle';
+                statusEl.textContent = status;
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+                pendingEl.textContent = data.pending || 0;
+
+                if (status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+
+                renderLogs(data.logs || []);
+
+                if (isTerminal(status)) {
+                    stopPolling();
+                } else {
+                    scheduleNext(2500);
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+                scheduleNext(5000);
+            });
+    }
+
+    poll();
+})();
+</script>
+</body>
+</html>

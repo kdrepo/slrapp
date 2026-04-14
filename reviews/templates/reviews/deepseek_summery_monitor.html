@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>DeepSeek Summery Monitor | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1220px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.35rem; }
+        button.stop { background: #b91c1c; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>DeepSeek Summery Extraction Monitor</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Target set: only papers where <code>full_text_decision = included</code> and <code>fulltext_retrieved = True</code>.</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="start">Start</button>
+            <button type="submit" name="action" value="retry_failed">Retry Failed</button>
+            <button type="submit" class="stop" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p class="muted">Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Done: <strong id="done">{{ stage.done|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong></p>
+        <p id="error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper ID</th>
+                    <th>Title</th>
+                    <th>Error Code</th>
+                    <th>Error Message</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id|default:"-" }}</td>
+                        <td>{{ row.title|default:"-" }}</td>
+                        <td>{{ row.error_code|default:"-" }}</td>
+                        <td>{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Processed Papers</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Paper ID</th>
+                    <th>Title</th>
+                    <th>Summery Status</th>
+                    <th>Summary Chars</th>
+                    <th>Extraction Saved</th>
+                    <th>Quality Saved</th>
+                    <th>Quality Score</th>
+                    <th>Risk of Bias</th>
+                    <th>Error</th>
+                    <th>Updated At</th>
+                </tr>
+            </thead>
+            <tbody id="completed-body">
+                {% for row in completed %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.title }}</td>
+                        <td>{{ row.full_text_summery_status }}</td>
+                        <td>{{ row.summary_chars }}</td>
+                        <td>{% if row.has_extraction %}Yes{% else %}No{% endif %}</td>
+                        <td>{% if row.has_quality %}Yes{% else %}No{% endif %}</td>
+                        <td>{{ row.quality_total_score|default:"-" }}</td>
+                        <td>{{ row.quality_risk_of_bias|default:"-" }}</td>
+                        <td>{{ row.full_text_summery_error|default:"-" }}</td>
+                        <td>{{ row.full_text_summery_updated_at|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="10">No processed papers yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const statusUrl = "{% url 'reviews:deepseek-summery-status' review.pk %}";
+    const statusEl = document.getElementById('status');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const doneEl = document.getElementById('done');
+    const failedEl = document.getElementById('failed');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+    const completedBody = document.getElementById('completed-body');
+
+    let timer = null;
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="6">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            return '<tr>' +
+                '<td>' + (row.time || '') + '</td>' +
+                '<td>' + (row.event || '') + '</td>' +
+                '<td>' + (row.paper_id || '-') + '</td>' +
+                '<td>' + (row.title || '-') + '</td>' +
+                '<td>' + (row.error_code || '-') + '</td>' +
+                '<td>' + (row.error_message || '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderCompleted(rows) {
+        if (!rows || rows.length === 0) {
+            completedBody.innerHTML = '<tr><td colspan="10">No processed papers yet.</td></tr>';
+            return;
+        }
+        completedBody.innerHTML = rows.map(function (row) {
+            return '<tr>' +
+                '<td>' + (row.id || '-') + '</td>' +
+                '<td>' + (row.title || '-') + '</td>' +
+                '<td>' + (row.full_text_summery_status || '-') + '</td>' +
+                '<td>' + (row.summary_chars || 0) + '</td>' +
+                '<td>' + ((row.has_extraction) ? 'Yes' : 'No') + '</td>' +
+                '<td>' + ((row.has_quality) ? 'Yes' : 'No') + '</td>' +
+                '<td>' + ((row.quality_total_score === '' || row.quality_total_score === null || row.quality_total_score === undefined) ? '-' : row.quality_total_score) + '</td>' +
+                '<td>' + (row.quality_risk_of_bias || '-') + '</td>' +
+                '<td>' + (row.full_text_summery_error || '-') + '</td>' +
+                '<td>' + (row.full_text_summery_updated_at || '-') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function isActive(status) {
+        return status === 'running' || status === 'queued' || status === 'stopping';
+    }
+
+    function clearTimer() {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    }
+
+    function scheduleNext(ms) {
+        clearTimer();
+        timer = setTimeout(poll, ms);
+    }
+
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                const status = data.status || 'idle';
+                statusEl.textContent = status;
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+
+                if (status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+
+                renderLogs(data.logs || []);
+                renderCompleted(data.completed || []);
+
+                if (isActive(status)) {
+                    scheduleNext(2500);
+                } else {
+                    clearTimer();
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+                scheduleNext(5000);
+            });
+    }
+
+    poll();
+})();
+</script>
+</body>
+</html>
+

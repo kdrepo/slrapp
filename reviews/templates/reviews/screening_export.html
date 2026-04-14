@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Export / Import Screening JSON | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 920px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        select, input[type="file"] { width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+        button { border: 0; border-radius: 7px; padding: 0.55rem 0.9rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-top: 0.7rem; }
+        .muted { color: #475569; font-size: 0.92rem; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Export / Import Screening JSON</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">Export papers by TA decision or upload external JSON decisions mapped by title.</p>
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Download JSON by TA Decision (Batches of {{ export_batch_size }})</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="download">
+            <label for="decision">TA decision category</label>
+            <select id="decision" name="decision" required>
+                {% for value, label in decision_choices %}
+                    <option value="{{ value }}" {% if selected_export_decision == value %}selected{% endif %}>{{ label }} ({{ value }})</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Generate Batch Links</button>
+        </form>
+    </div>
+
+    {% if batch_links %}
+    <div class="card">
+        <h2>Download Batches</h2>
+        <p class="muted">Total batches: <strong>{{ batch_links|length }}</strong>. Naming format: <code>batch_XX_start-end</code>.</p>
+        <ul>
+            {% for item in batch_links %}
+                <li>
+                    <a href="{{ item.url }}">{{ item.label }}</a>
+                    <span class="muted">({{ item.count }} papers)</span>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Upload JSON Decision File</h2>
+        <p class="muted">Expected per-row format includes: <code>Title</code>, <code>decision</code>, <code>rq_tag</code>, <code>confidence</code>, <code>reason</code>, <code>criterion</code>. (Backward compatible with <code>criterion_failed</code>.)</p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload">
+            <label for="json_file">JSON file</label>
+            <input id="json_file" type="file" name="json_file" accept="application/json,.json" required>
+            <button type="submit">Upload and Apply</button>
+        </form>
+    </div>
+
+</div>
+</body>
+</html>
+
+
+
+

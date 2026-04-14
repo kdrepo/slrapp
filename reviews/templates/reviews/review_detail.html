@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ object.title }}</title>
+    <style>
+        body {
+            font-family: "Palatino Linotype", Garamond, serif;
+            margin: 2rem auto;
+            max-width: 920px;
+            padding: 0 1rem;
+            line-height: 1.5;
+            background: #f9fafb;
+            color: #1f2937;
+        }
+        .card {
+            border: 1px solid #d5dae0;
+            border-radius: 10px;
+            padding: 1rem;
+            background: #fff;
+            margin-bottom: 1rem;
+        }
+        .status {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            background: #e5f7ef;
+            border: 1px solid #a7dec2;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=object %}
+    <div class="card">
+        <h1>{{ object.title }}</h1>
+        <p><span class="status">Status: {{ object.get_status_display }}</span></p>
+        <p><strong>Objectives:</strong> {{ object.objectives }}</p>
+    </div>
+
+    <div class="card">
+        <h2>PICO</h2>
+        <p><strong>Population:</strong> {{ object.pico_population }}</p>
+        <p><strong>Intervention:</strong> {{ object.pico_intervention }}</p>
+        <p><strong>Comparison:</strong> {{ object.pico_comparison }}</p>
+        <p><strong>Outcomes:</strong> {{ object.pico_outcomes }}</p>
+    </div>
+
+    <div class="card">
+        <h2>Criteria</h2>
+        <p><strong>Inclusion:</strong><br>{{ object.inclusion_criteria|linebreaksbr }}</p>
+        <p><strong>Exclusion:</strong><br>{{ object.exclusion_criteria|linebreaksbr }}</p>
+    </div>
+

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Create Review</title>
+    <style>
+        :root {
+            --bg: #f4efe8;
+            --ink: #12212f;
+            --card: #fff8ee;
+            --accent: #0a7e6f;
+            --line: #ddcdb7;
+        }
+        body {
+            font-family: Georgia, "Times New Roman", serif;
+            margin: 0;
+            background: radial-gradient(circle at top right, #fef5df 0%, var(--bg) 48%, #ebe4d8 100%);
+            color: var(--ink);
+        }
+        .wrap {
+            max-width: 920px;
+            margin: 2.2rem auto;
+            padding: 0 1rem;
+        }
+        form {
+            display: grid;
+            gap: 1rem;
+        }
+        .section {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 6px 14px rgba(26, 32, 37, 0.05);
+        }
+        h1, h2 { margin-top: 0; }
+        label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        input, textarea, button {
+            font: inherit;
+        }
+        input, textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #bda888;
+            border-radius: 7px;
+            padding: 0.65rem;
+            background: #fff;
+            margin-bottom: 0.75rem;
+        }
+        .errorlist { color: #9f1239; margin: 0.2rem 0 0.7rem; }
+        button {
+            width: fit-content;
+            border: 0;
+            border-radius: 7px;
+            padding: 0.72rem 1.2rem;
+            color: #fff;
+            background: var(--accent);
+            cursor: pointer;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' %}
+<div class="wrap">
+    <h1>Start a Systematic Literature Review</h1>
+    <p>Phase 1 intake. After submission, Phase 2 will run AI formalization and open a confirmation screen.</p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <section class="section">
+            <h2>Section 1: Review Scope</h2>
+            {{ form.title.label_tag }}
+            {{ form.title }}
+            {{ form.title.errors }}
+            {{ form.objectives.label_tag }}
+            {{ form.objectives }}
+            {{ form.objectives.errors }}
+        </section>
+
+        <section class="section">
+            <h2>Section 2: PICO</h2>
+            {{ form.pico_population.label_tag }}
+            {{ form.pico_population }}
+            {{ form.pico_population.errors }}
+            {{ form.pico_intervention.label_tag }}
+            {{ form.pico_intervention }}
+            {{ form.pico_intervention.errors }}
+            {{ form.pico_comparison.label_tag }}
+            {{ form.pico_comparison }}
+            {{ form.pico_comparison.errors }}
+            {{ form.pico_outcomes.label_tag }}
+            {{ form.pico_outcomes }}
+            {{ form.pico_outcomes.errors }}
+        </section>
+
+        <section class="section">
+            <h2>Section 3: Eligibility Criteria</h2>
+            {{ form.inclusion_criteria.label_tag }}
+            {{ form.inclusion_criteria }}
+            {{ form.inclusion_criteria.errors }}
+            {{ form.exclusion_criteria.label_tag }}
+            {{ form.exclusion_criteria }}
+            {{ form.exclusion_criteria.errors }}
+        </section>
+
+        <button type="submit">Submit Intake</button>
+    </form>
+</div>
+</body>
+</html>
+

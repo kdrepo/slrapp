@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Screening Conflicts | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7fafc; color: #1f2937; }
+        .wrap { max-width: 1080px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.65rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .btn { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; color: #fff; font-weight: 700; cursor: pointer; }
+        .include { background: #047857; }
+        .exclude { background: #b91c1c; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Phase 9: Conflict Resolution</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+    </div>
+
+    <div class="card">
+        <h2>Locked Research Questions</h2>
+        {% if research_questions %}
+            <ol>
+                {% for rq in research_questions %}
+                    <li>{{ rq.question_text }}</li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p>No locked research questions found.</p>
+        {% endif %}
+    </div>
+
+    {% if messages %}
+        <div class="card">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Flagged Papers (screening_conflict = True)</h2>
+        {% if conflicts %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Paper</th>
+                        <th>AI Decision</th>
+                        <th>Confidence</th>
+                        <th>Reason</th>
+                        <th>Resolve</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for paper in conflicts %}
+                    <tr>
+                        <td>
+                            <strong>{{ paper.title }}</strong><br>
+                            <small>{{ paper.authors|default:"" }}</small>
+                        </td>
+                        <td>{{ paper.ta_decision|default:"(empty)" }}</td>
+                        <td>{{ paper.ta_confidence }}</td>
+                        <td>{{ paper.ta_reason }}</td>
+                        <td>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="paper_id" value="{{ paper.id }}">
+                                <input type="hidden" name="decision" value="included">
+                                <button class="btn include" type="submit">Include</button>
+                            </form>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="paper_id" value="{{ paper.id }}">
+                                <input type="hidden" name="decision" value="excluded">
+                                <button class="btn exclude" type="submit">Exclude</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No unresolved conflicts. Great progress.</p>
+        {% endif %}
+    </div>
+
+</div>
+</body>
+</html>
+

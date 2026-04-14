@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Elsevier PDF Debug | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.5rem 0.85rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; }
+        button.stop { background: #b91c1c; }
+        .muted { color: #475569; font-size: 0.92rem; }
+        .status { font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .mono { font-family: Consolas, "Courier New", monospace; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Elsevier Full-Text Debug</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="muted">API: <code>/content/article/doi/{doi}?view=FULL</code> with fallback <code>/content/article/eid/{eid}?view=FULL</code>. Headers: <code>X-ELS-APIKey</code>, <code>X-ELS-Insttoken</code>, <code>Accept: application/pdf</code>.</p>
+        <button id="start-btn" type="button">Start Elsevier Debug Run</button>
+        <button id="stop-btn" class="stop" type="button">Stop Run</button>
+        <p id="start-msg" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <p>Status: <span id="status" class="status">{{ stage.status|default:"idle" }}</span></p>
+        <p class="muted">Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> | Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> | Downloaded: <strong id="downloaded">{{ stage.downloaded|default:0 }}</strong> | Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong></p>
+        <p id="fatal-error" class="muted"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Debug Log</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Paper</th>
+                    <th>Status Code</th>
+                    <th>Error Type</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody id="log-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td class="mono">{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.paper_id }} - {{ row.title }}</td>
+                        <td>{{ row.status_code|default:"-" }}</td>
+                        <td>{{ row.error_type|default:"-" }}</td>
+                        <td>{{ row.message }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">No logs yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const startUrl = "{% url 'reviews:elsevier-pdf-debug-start' review.pk %}";
+    const stopUrl = "{% url 'reviews:elsevier-pdf-debug-stop' review.pk %}";
+    const statusUrl = "{% url 'reviews:elsevier-pdf-debug-status' review.pk %}";
+
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const startMsg = document.getElementById('start-msg');
+    const statusEl = document.getElementById('status');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const downloadedEl = document.getElementById('downloaded');
+    const failedEl = document.getElementById('failed');
+    const fatalErrEl = document.getElementById('fatal-error');
+    const logBody = document.getElementById('log-body');
+
+    let pollTimer = null;
+
+    function csrfToken() {
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logBody.innerHTML = '<tr><td colspan="6">No logs yet.</td></tr>';
+            return;
+        }
+
+        logBody.innerHTML = logs.map(function (row) {
+            return '<tr>' +
+                '<td class="mono">' + (row.time || '') + '</td>' +
+                '<td>' + (row.event || '') + '</td>' +
+                '<td>' + ((row.paper_id || '') + ' - ' + (row.title || '')) + '</td>' +
+                '<td>' + (row.status_code || '-') + '</td>' +
+                '<td>' + (row.error_type || '-') + '</td>' +
+                '<td>' + (row.message || '') + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function stopPollingIfTerminal(status) {
+        if (['completed', 'stopped', 'error'].indexOf(status) >= 0 && pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function refresh() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.ok) {
+                    return;
+                }
+                const snap = data.snapshot || {};
+                const status = snap.status || 'idle';
+                statusEl.textContent = status;
+                targetedEl.textContent = snap.targeted || 0;
+                processedEl.textContent = snap.processed || 0;
+                downloadedEl.textContent = snap.downloaded || 0;
+                failedEl.textContent = snap.failed || 0;
+                fatalErrEl.textContent = snap.error ? ('Fatal Error: ' + snap.error) : '';
+                renderLogs(snap.logs || []);
+                stopPollingIfTerminal(status);
+            })
+            .catch(function () {
+                fatalErrEl.textContent = 'Status polling failed. Retrying...';
+            });
+    }
+
+    startBtn.addEventListener('click', function () {
+        startBtn.disabled = true;
+        startMsg.textContent = 'Starting Elsevier debug run...';
+
+        fetch(startUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken() },
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    startMsg.textContent = data.message || 'Started.';
+                    if (!pollTimer) {
+                        pollTimer = setInterval(refresh, 2000);
+                    }
+                } else {
+                    startMsg.textContent = data.error || 'Failed to start.';
+                }
+                startBtn.disabled = false;
+                refresh();
+            })
+            .catch(function () {
+                startMsg.textContent = 'Failed to start debug run.';
+                startBtn.disabled = false;
+            });
+    });
+
+    stopBtn.addEventListener('click', function () {
+        stopBtn.disabled = true;
+        startMsg.textContent = 'Requesting stop...';
+
+        fetch(stopUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken() },
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                startMsg.textContent = data.ok ? (data.message || 'Stop requested.') : (data.error || 'Unable to stop.');
+                stopBtn.disabled = false;
+                refresh();
+            })
+            .catch(function () {
+                startMsg.textContent = 'Failed to send stop request.';
+                stopBtn.disabled = false;
+            });
+    });
+
+    refresh();
+    pollTimer = setInterval(refresh, 2000);
+})();
+</script>
+</body>
+</html>
+

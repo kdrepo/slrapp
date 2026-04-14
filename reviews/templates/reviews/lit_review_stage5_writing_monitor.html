@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>LR Stage 5a Section Writing</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f4f7fb; color: #1f2937; }
+        .wrap { max-width: 1250px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d5dde7; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        button { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: 0.55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+        .topnav { background: #0f172a; color: #dbeafe; padding: 0.8rem 1rem; }
+        .topnav a { color: #bfdbfe; text-decoration: none; font-weight: 600; margin-right: 0.9rem; }
+        .warn { color: #92400e; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 0.6rem 0.8rem; margin-top: 0.7rem; }
+    </style>
+</head>
+<body>
+<div class="topnav">
+    <strong>Literature Review App</strong>
+    <a href="{% url 'lit_reviews:stage2-intake' lit_review.pk %}">Stage 2 Intake</a>
+    <a href="{% url 'lit_reviews:stage3-mineru-monitor' lit_review.pk %}">Stage 3 MinerU</a>
+    <a href="{% url 'lit_reviews:stage4-extraction-monitor' lit_review.pk %}">Stage 4a Extraction</a>
+    <a href="{% url 'lit_reviews:stage4b-assignment-monitor' lit_review.pk %}">Stage 4b Assignment</a>
+    <a href="{% url 'lit_reviews:stage5b-stitch-monitor' lit_review.pk %}">Stage 5b Stitching</a>
+    <a href="{% url 'lit_reviews:stage5c-references-monitor' lit_review.pk %}">Stage 5c References</a>
+</div>
+<div class="wrap">
+    <div class="card">
+        <h1>Stage 5a: Section Writing</h1>
+        <p>Review ID: <strong>{{ lit_review.id }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="write_remaining">Write Remaining Sections</button>
+            <button type="submit" name="action" value="rewrite_all">Rewrite All Sections</button>
+            <button type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+    <div class="card">
+        {% for message in messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <span id="status" class="status-pill">{{ stage.status|default:"idle" }}</span></p>
+        <p>
+            Targeted: <strong id="targeted">{{ stage.targeted|default:0 }}</strong> |
+            Processed: <strong id="processed">{{ stage.processed|default:0 }}</strong> |
+            Done: <strong id="done">{{ stage.done|default:0 }}</strong> |
+            Failed: <strong id="failed">{{ stage.failed|default:0 }}</strong>
+        </p>
+        <p>
+            Total words (actual): <strong id="actual_total_words">{{ stage.actual_total_words|default:0 }}</strong> |
+            Target words: <strong id="target_total_words">{{ stage.target_total_words|default:0 }}</strong> |
+            Drift: <strong id="drift_pct">{{ stage.drift_pct|default:0 }}</strong>%
+        </p>
+        <p id="drift_warn" class="warn" {% if not stage.drift_warning %}style="display:none;"{% endif %}>
+            Word-count drift is above 10%. Consider a rewrite pass for one or more sections.
+        </p>
+        <p id="error" style="color:#b91c1c;"></p>
+    </div>
+
+    <div class="card">
+        <h2>Live Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Section</th>
+                    <th>Word Count</th>
+                    <th>Notes</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.event }}</td>
+                        <td>{{ row.section_number|default:"-" }} — {{ row.section_title|default:"-" }}</td>
+                        <td>{{ row.word_count|default:"-" }}</td>
+                        <td>{{ row.notes_for_user|default:"-" }}</td>
+                        <td>{% if row.error_code %}{{ row.error_code }}: {% endif %}{{ row.error_message|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">No events yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Sections</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Section #</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Has Prose</th>
+                    <th>Word Count</th>
+                </tr>
+            </thead>
+            <tbody id="sections-body">
+                {% for row in sections %}
+                    <tr>
+                        <td>{{ row.section_number }}</td>
+                        <td>{{ row.section_title }}</td>
+                        <td>{{ row.section_type }}</td>
+                        <td>{% if row.has_prose %}Yes{% else %}No{% endif %}</td>
+                        <td>{{ row.word_count }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5">No sections found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+(function () {
+    const statusUrl = "{% url 'lit_reviews:stage5-writing-status' lit_review.pk %}";
+    const statusEl = document.getElementById('status');
+    const targetedEl = document.getElementById('targeted');
+    const processedEl = document.getElementById('processed');
+    const doneEl = document.getElementById('done');
+    const failedEl = document.getElementById('failed');
+    const actualEl = document.getElementById('actual_total_words');
+    const targetEl = document.getElementById('target_total_words');
+    const driftEl = document.getElementById('drift_pct');
+    const driftWarnEl = document.getElementById('drift_warn');
+    const errorEl = document.getElementById('error');
+    const logsBody = document.getElementById('logs-body');
+    const sectionsBody = document.getElementById('sections-body');
+
+    function renderLogs(logs) {
+        if (!logs || logs.length === 0) {
+            logsBody.innerHTML = '<tr><td colspan="6">No events yet.</td></tr>';
+            return;
+        }
+        logsBody.innerHTML = logs.map(function (row) {
+            const err = row.error_code ? (row.error_code + ': ' + (row.error_message || '')) : (row.error_message || '-');
+            return '<tr>'
+                + '<td>' + (row.time || '') + '</td>'
+                + '<td>' + (row.event || '') + '</td>'
+                + '<td>' + ((row.section_number || '-') + ' — ' + (row.section_title || '-')) + '</td>'
+                + '<td>' + ((row.word_count === null || row.word_count === undefined || row.word_count === '') ? '-' : row.word_count) + '</td>'
+                + '<td>' + (row.notes_for_user || '-') + '</td>'
+                + '<td>' + err + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function renderSections(rows) {
+        if (!rows || rows.length === 0) {
+            sectionsBody.innerHTML = '<tr><td colspan="5">No sections found.</td></tr>';
+            return;
+        }
+        sectionsBody.innerHTML = rows.map(function (row) {
+            return '<tr>'
+                + '<td>' + (row.section_number || '-') + '</td>'
+                + '<td>' + (row.section_title || '-') + '</td>'
+                + '<td>' + (row.section_type || '-') + '</td>'
+                + '<td>' + (row.has_prose ? 'Yes' : 'No') + '</td>'
+                + '<td>' + (row.word_count || 0) + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    function isTerminal(status) {
+        return status === 'completed' || status === 'stopped' || status === 'error';
+    }
+
+    let timer = null;
+    function poll() {
+        fetch(statusUrl)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.status || 'idle';
+                targetedEl.textContent = data.targeted || 0;
+                processedEl.textContent = data.processed || 0;
+                doneEl.textContent = data.done || 0;
+                failedEl.textContent = data.failed || 0;
+                actualEl.textContent = data.actual_total_words || 0;
+                targetEl.textContent = data.target_total_words || 0;
+                driftEl.textContent = (data.drift_pct === undefined || data.drift_pct === null) ? 0 : data.drift_pct;
+                if (data.drift_warning) {
+                    driftWarnEl.style.display = 'block';
+                } else {
+                    driftWarnEl.style.display = 'none';
+                }
+
+                if (data.status === 'error') {
+                    errorEl.textContent = 'Error [' + (data.error_code || 'UnknownError') + ']: ' + (data.error_message || '');
+                } else {
+                    errorEl.textContent = '';
+                }
+                renderLogs(data.logs || []);
+                renderSections(data.sections || []);
+
+                if (isTerminal(data.status) && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(function () {
+                errorEl.textContent = 'Status polling failed. Retrying...';
+            });
+    }
+
+    poll();
+    timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

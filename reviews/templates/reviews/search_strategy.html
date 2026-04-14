@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Search Strategy | {{ review.title }}</title>
+    <style>
+        :root {
+            --ink: #1f2937;
+            --bg: #f6f9fb;
+            --card: #ffffff;
+            --line: #d6dde5;
+            --accent: #0e7490;
+        }
+        body {
+            margin: 0;
+            font-family: Cambria, "Segoe UI", serif;
+            background: linear-gradient(180deg, #e9f7fb 0%, var(--bg) 45%, #fefefe 100%);
+            color: var(--ink);
+        }
+        .wrap {
+            max-width: 1080px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 22px rgba(16, 24, 40, 0.06);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #d8e2ea;
+            padding: 0.7rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #eff5fa;
+        }
+        .query {
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.92rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .copy-btn {
+            border: 0;
+            border-radius: 7px;
+            background: var(--accent);
+            color: #fff;
+            padding: 0.45rem 0.75rem;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .hint {
+            background: #ecfeff;
+            border-left: 4px solid #0891b2;
+            padding: 0.7rem 0.9rem;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="panel">
+        <h1>Phase 3: Scopus Search Strategy</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p class="hint">Please run these 4 queries in Scopus and download the results in RIS format for the next step.</p>
+    </div>
+
+    {% if messages %}
+        <div class="panel">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="panel">
+        {% if search_queries %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Focus</th>
+                        <th>Boolean Query</th>
+                        <th>Rationale</th>
+                        <th>Copy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in search_queries %}
+                        <tr>
+                            <td>{{ item.get_focus_display }}</td>
+                            <td class="query" id="query-{{ forloop.counter }}">{{ item.query_string }}</td>
+                            <td>{{ item.rationale }}</td>
+                            <td>
+                                <button class="copy-btn" type="button" onclick="copyQuery('query-{{ forloop.counter }}', this)">Copy to Clipboard</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No queries available yet. Refresh this page after checking Gemini configuration.</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function copyQuery(elementId, btn) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(function () {
+        const old = btn.innerText;
+        btn.innerText = 'Copied';
+        setTimeout(function () {
+            btn.innerText = old;
+        }, 1200);
+    });
+}
+</script>
+</body>
+</html>
+
