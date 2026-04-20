@@ -12,6 +12,18 @@ the systematic review.
 - Ensure claims are cited from the registry by short_ref.
 - End with implications for the overall review and any gaps this theme reveals
 
+THEORETICAL INTEGRATION REQUIREMENT:
+After reconciling the empirical evidence, add one final paragraph addressing:
+What does the evidence on this theme reveal about the explanatory power, limitations,
+or boundaries of {primary_lens}?
+
+Specifically:
+- Does the evidence support, extend, challenge, or qualify {primary_lens}?
+- Are there findings in this theme that {primary_lens} cannot explain?
+- What theoretical refinement does this theme-level evidence call for?
+
+This final paragraph must make a theoretical claim, not just describe findings.
+
 PUBLICATION STYLE CONSTRAINTS (MANDATORY):
 - Do NOT mention internal roles, process, or debate framing.
 - Never use words like: Advocate, Critic, Reconciler, pass, loop, prompt, or "this argument".

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Theoretical Anchoring | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7f9fc; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d6dee8; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        .btn { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: .4rem; }
+        .btn.stop { background: #b91c1c; }
+        pre { background: #0b1220; color: #e2e8f0; padding: .8rem; border-radius: 8px; overflow: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: .55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Part 1: Theoretical Framework Anchoring</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <p>Selected Lens: <strong id="selected_lens">{{ theoretical_framework.primary_lens|default:"(not set)" }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <button class="btn" type="submit" name="action" value="run_landscape">Run Theory Landscape</button>
+            <button class="btn" type="submit" name="action" value="run_cross_theme">Run Cross-Theme Synthesis</button>
+            <button class="btn stop" type="submit" name="action" value="stop">Stop</button>
+        </form>
+    </div>
+
+    {% if messages %}
+    <div class="card">
+        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <strong id="status">{{ stage.status|default:"idle" }}</strong></p>
+        <p id="error"></p>
+    </div>
+
+    <div class="card">
+        <h2>Logs</h2>
+        <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Message</th><th>Error</th></tr></thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                <tr>
+                    <td>{{ row.time }}</td>
+                    <td>{{ row.event }}</td>
+                    <td>{{ row.message|default:"-" }}</td>
+                    <td>{% if row.error_code %}{{ row.error_code }}: {{ row.error_message }}{% else %}-{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No logs yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Scaffold: theoretical_framework</h2>
+        <pre id="theoretical_framework">{% if theoretical_framework %}{{ theoretical_framework|safe }}{% else %}{}{% endif %}</pre>
+    </div>
+
+    {% if theoretical_framework.status == 'awaiting_confirmation' %}
+    <div class="card">
+        <h2>Theoretical Lens Confirmation</h2>
+        <p><strong>Recommended:</strong> {{ theoretical_framework.recommended|default:"-" }}</p>
+        <form method="post" style="margin-bottom:.8rem;">
+            {% csrf_token %}
+            <button class="btn" type="submit" name="action" value="confirm_recommended_lens">Use Recommended Lens</button>
+        </form>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="confirm_alternative_lens">
+            <label for="selected_lens"><strong>Choose alternative:</strong></label>
+            <select id="selected_lens" name="selected_lens">
+                {% for row in theoretical_framework.alternatives %}
+                <option value="{{ row.theory_name }}">{{ row.theory_name }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn" type="submit">Confirm Selected Alternative</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Scaffold: theory_landscape</h2>
+        <pre id="theory_landscape">{% if theory_landscape %}{{ theory_landscape|safe }}{% else %}{}{% endif %}</pre>
+    </div>
+
+    <div class="card">
+        <h2>Scaffold: theoretical_synthesis</h2>
+        <pre id="theoretical_synthesis">{% if theoretical_synthesis %}{{ theoretical_synthesis|safe }}{% else %}{}{% endif %}</pre>
+    </div>
+
+    <div class="card">
+        <h2>Consistency Check: 17A vs TCCM</h2>
+        <pre id="theory_consistency">{% if stage.theory_consistency_check %}{{ stage.theory_consistency_check|safe }}{% else %}{}{% endif %}</pre>
+    </div>
+</div>
+
+<script>
+(function(){
+  const statusUrl = "{% url 'reviews:theory-anchoring-status' review.pk %}";
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const logsBody = document.getElementById('logs-body');
+  const tfEl = document.getElementById('theoretical_framework');
+  const tlEl = document.getElementById('theory_landscape');
+  const tsEl = document.getElementById('theoretical_synthesis');
+  const tcEl = document.getElementById('theory_consistency');
+  const selectedLensEl = document.getElementById('selected_lens');
+
+  function renderLogs(logs){
+    if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
+    logsBody.innerHTML = logs.map(l => '<tr><td>'+(l.time||'')+'</td><td>'+(l.event||'')+'</td><td>'+(l.message||'-')+'</td><td>'+((l.error_code?(l.error_code+': '+(l.error_message||'')):'-'))+'</td></tr>').join('');
+  }
+  function isTerminal(s){ return s==='completed' || s==='stopped' || s==='error'; }
+  let timer = null;
+  function poll(){
+    fetch(statusUrl).then(r=>r.json()).then(data=>{
+      statusEl.textContent = data.status || 'idle';
+      errorEl.textContent = data.status === 'error' ? ('Error ['+(data.error_code||'UnknownError')+']: '+(data.error_message||'')) : '';
+      renderLogs(data.logs || []);
+      tfEl.textContent = JSON.stringify(data.theoretical_framework || {}, null, 2);
+      tlEl.textContent = JSON.stringify(data.theory_landscape || {}, null, 2);
+      tsEl.textContent = JSON.stringify(data.theoretical_synthesis || {}, null, 2);
+      tcEl.textContent = JSON.stringify(data.theory_consistency_check || {}, null, 2);
+      selectedLensEl.textContent = (data.theoretical_framework || {}).primary_lens || '(not set)';
+      if(isTerminal(data.status) && timer){ clearInterval(timer); timer = null; }
+    }).catch(()=>{});
+  }
+  poll();
+  timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

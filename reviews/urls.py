@@ -38,9 +38,21 @@ from .views_theme_synthesis import (
     ThemeSynthesisMonitorView,
     ThemeSynthesisStatusView,
 )
+from .views_theory_anchoring import (
+    TheoryAnchoringMonitorView,
+    TheoryAnchoringStatusView,
+)
 from .views_dialectical import (
     DialecticalMonitorView,
     DialecticalStatusView,
+)
+from .views_conceptual_model import (
+    ConceptualModelMonitorView,
+    ConceptualModelStatusView,
+)
+from .views_tccm import (
+    TCCMMonitorView,
+    TCCMStatusView,
 )
 from .views_ghostwriter import (
     GhostwriterMonitorView,
@@ -100,8 +112,14 @@ urlpatterns = [
     path('reviews/<int:pk>/deepseek-summery/status/', DeepSeekSummeryStatusView.as_view(), name='deepseek-summery-status'),
     path('reviews/<int:pk>/theme-synthesis/monitor/', ThemeSynthesisMonitorView.as_view(), name='theme-synthesis-monitor'),
     path('reviews/<int:pk>/theme-synthesis/status/', ThemeSynthesisStatusView.as_view(), name='theme-synthesis-status'),
+    path('reviews/<int:pk>/theory-anchoring/monitor/', TheoryAnchoringMonitorView.as_view(), name='theory-anchoring-monitor'),
+    path('reviews/<int:pk>/theory-anchoring/status/', TheoryAnchoringStatusView.as_view(), name='theory-anchoring-status'),
     path('reviews/<int:pk>/dialectical/monitor/', DialecticalMonitorView.as_view(), name='dialectical-monitor'),
     path('reviews/<int:pk>/dialectical/status/', DialecticalStatusView.as_view(), name='dialectical-status'),
+    path('reviews/<int:pk>/conceptual-model/monitor/', ConceptualModelMonitorView.as_view(), name='conceptual-model-monitor'),
+    path('reviews/<int:pk>/conceptual-model/status/', ConceptualModelStatusView.as_view(), name='conceptual-model-status'),
+    path('reviews/<int:pk>/tccm/monitor/', TCCMMonitorView.as_view(), name='tccm-monitor'),
+    path('reviews/<int:pk>/tccm/status/', TCCMStatusView.as_view(), name='tccm-status'),
     path('reviews/<int:pk>/ghostwriter/monitor/', GhostwriterMonitorView.as_view(), name='ghostwriter-monitor'),
     path('reviews/<int:pk>/ghostwriter/status/', GhostwriterStatusView.as_view(), name='ghostwriter-status'),
     path('reviews/<int:pk>/visual-assets/monitor/', VisualAssetsMonitorView.as_view(), name='visual-assets-monitor'),

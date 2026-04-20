@@ -27,6 +27,7 @@
             {% csrf_token %}
             <button type="submit" name="action" value="start">Start</button>
             <button type="submit" name="action" value="retry_failed">Retry Failed</button>
+            <button type="submit" name="action" value="replace_extraction">Replace Extraction</button>
             <button type="submit" class="stop" name="action" value="stop">Stop</button>
         </form>
     </div>
@@ -85,9 +86,16 @@
                     <th>Summery Status</th>
                     <th>Summary Chars</th>
                     <th>Extraction Saved</th>
+                    <th>Theory Count</th>
+                    <th>Top Theories</th>
                     <th>Quality Saved</th>
                     <th>Quality Score</th>
                     <th>Risk of Bias</th>
+                    <th>TCCM Saved</th>
+                    <th>TCCM Theory Count</th>
+                    <th>TCCM Characteristics</th>
+                    <th>TCCM Context</th>
+                    <th>TCCM Methods</th>
                     <th>Error</th>
                     <th>Updated At</th>
                 </tr>
@@ -100,14 +108,21 @@
                         <td>{{ row.full_text_summery_status }}</td>
                         <td>{{ row.summary_chars }}</td>
                         <td>{% if row.has_extraction %}Yes{% else %}No{% endif %}</td>
+                        <td>{{ row.theoretical_framework_count|default:"0" }}</td>
+                        <td>{{ row.top_theories|default:"-" }}</td>
                         <td>{% if row.has_quality %}Yes{% else %}No{% endif %}</td>
                         <td>{{ row.quality_total_score|default:"-" }}</td>
                         <td>{{ row.quality_risk_of_bias|default:"-" }}</td>
+                        <td>{% if row.has_tccm %}Yes{% else %}No{% endif %}</td>
+                        <td>{{ row.tccm_theory_count|default:"0" }}</td>
+                        <td>{% if row.tccm_has_characteristics %}Yes{% else %}No{% endif %}</td>
+                        <td>{% if row.tccm_has_context %}Yes{% else %}No{% endif %}</td>
+                        <td>{% if row.tccm_has_methods %}Yes{% else %}No{% endif %}</td>
                         <td>{{ row.full_text_summery_error|default:"-" }}</td>
                         <td>{{ row.full_text_summery_updated_at|default:"-" }}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="10">No processed papers yet.</td></tr>
+                    <tr><td colspan="15">No processed papers yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -148,7 +163,7 @@
 
     function renderCompleted(rows) {
         if (!rows || rows.length === 0) {
-            completedBody.innerHTML = '<tr><td colspan="10">No processed papers yet.</td></tr>';
+            completedBody.innerHTML = '<tr><td colspan="15">No processed papers yet.</td></tr>';
             return;
         }
         completedBody.innerHTML = rows.map(function (row) {
@@ -158,9 +173,16 @@
                 '<td>' + (row.full_text_summery_status || '-') + '</td>' +
                 '<td>' + (row.summary_chars || 0) + '</td>' +
                 '<td>' + ((row.has_extraction) ? 'Yes' : 'No') + '</td>' +
+                '<td>' + ((row.theoretical_framework_count === '' || row.theoretical_framework_count === null || row.theoretical_framework_count === undefined) ? 0 : row.theoretical_framework_count) + '</td>' +
+                '<td>' + (row.top_theories || '-') + '</td>' +
                 '<td>' + ((row.has_quality) ? 'Yes' : 'No') + '</td>' +
                 '<td>' + ((row.quality_total_score === '' || row.quality_total_score === null || row.quality_total_score === undefined) ? '-' : row.quality_total_score) + '</td>' +
                 '<td>' + (row.quality_risk_of_bias || '-') + '</td>' +
+                '<td>' + ((row.has_tccm) ? 'Yes' : 'No') + '</td>' +
+                '<td>' + ((row.tccm_theory_count === '' || row.tccm_theory_count === null || row.tccm_theory_count === undefined) ? 0 : row.tccm_theory_count) + '</td>' +
+                '<td>' + ((row.tccm_has_characteristics) ? 'Yes' : 'No') + '</td>' +
+                '<td>' + ((row.tccm_has_context) ? 'Yes' : 'No') + '</td>' +
+                '<td>' + ((row.tccm_has_methods) ? 'Yes' : 'No') + '</td>' +
                 '<td>' + (row.full_text_summery_error || '-') + '</td>' +
                 '<td>' + (row.full_text_summery_updated_at || '-') + '</td>' +
                 '</tr>';

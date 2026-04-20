@@ -79,6 +79,15 @@ class DialecticalSynthesizer:
             or os.getenv('DEEPSEEK_DIALECTICAL_MODEL', '')
             or 'deepseek-reasoner'
         )
+        scaffold_data = self.review.scaffold_data if isinstance(self.review.scaffold_data, dict) else {}
+        theoretical_framework = scaffold_data.get('theoretical_framework', {}) if isinstance(scaffold_data.get('theoretical_framework'), dict) else {}
+        self.primary_lens = (
+            str(
+                theoretical_framework.get('primary_lens')
+                or theoretical_framework.get('recommended')
+                or 'the primary theoretical lens'
+            )
+        )
 
     def run(self):
         stage = self.review.stage_progress or {}
@@ -172,6 +181,7 @@ class DialecticalSynthesizer:
                 'advocate_text': advocate_text,
                 'critic_text': critic_text,
                 'theme_extractions_json': extraction_json,
+                'primary_lens': self.primary_lens,
             },
             target_words=550,
         )

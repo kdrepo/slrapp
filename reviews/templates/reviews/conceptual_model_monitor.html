@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Conceptual Model | {{ review.title }}</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; margin: 0; background: #f7f9fc; color: #1f2937; }
+        .wrap { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #fff; border: 1px solid #d6dee8; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+        .btn { border: 0; border-radius: 7px; padding: 0.45rem 0.75rem; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; margin-right: .4rem; }
+        .btn.stop { background: #b91c1c; }
+        .link { color: #1d4ed8; text-decoration: none; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d8e2ea; padding: .55rem; text-align: left; vertical-align: top; }
+        th { background: #eff5fa; }
+        pre { background: #0b1220; color: #e2e8f0; padding: .8rem; border-radius: 8px; overflow: auto; }
+    </style>
+</head>
+<body>
+    {% include 'reviews/_app_nav.html' with review=review %}
+<div class="wrap">
+    <div class="card">
+        <h1>Part 2: Conceptual Model / Research Framework</h1>
+        <p>Review: <strong>{{ review.title }}</strong></p>
+        <form method="post">
+            {% csrf_token %}
+            <button class="btn" type="submit" name="action" value="run_spec">Generate JSON Spec</button>
+            <button class="btn stop" type="submit" name="action" value="stop">Stop</button>
+        </form>
+        <p><a class="link" href="{% url 'reviews:visual-assets-gallery' review.pk %}">Open Visual Gallery</a> (JSON files only at this stage)</p>
+    </div>
+
+    {% if messages %}
+    <div class="card">
+        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <p>Status: <strong id="status">{{ stage.status|default:"idle" }}</strong></p>
+        <p id="error"></p>
+    </div>
+
+    <div class="card">
+        <h2>Logs</h2>
+        <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Message</th><th>Error</th></tr></thead>
+            <tbody id="logs-body">
+                {% for row in stage.logs %}
+                <tr>
+                    <td>{{ row.time }}</td>
+                    <td>{{ row.event }}</td>
+                    <td>{{ row.message|default:"-" }}</td>
+                    <td>{% if row.error_code %}{{ row.error_code }}: {{ row.error_message }}{% else %}-{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No logs yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Conceptual Model Spec</h2>
+        <pre id="spec">{% if conceptual_model_spec %}{{ conceptual_model_spec|safe }}{% else %}{}{% endif %}</pre>
+    </div>
+
+    <div class="card">
+        <h2>Model Narrative</h2>
+        <pre id="narrative">{% if conceptual_model_narrative %}{{ conceptual_model_narrative|safe }}{% else %}{% endif %}</pre>
+    </div>
+</div>
+
+<script>
+(function(){
+  const statusUrl = "{% url 'reviews:conceptual-model-status' review.pk %}";
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const logsBody = document.getElementById('logs-body');
+  const specEl = document.getElementById('spec');
+  const narrativeEl = document.getElementById('narrative');
+
+  function renderLogs(logs){
+    if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
+    logsBody.innerHTML = logs.map(l => '<tr><td>'+(l.time||'')+'</td><td>'+(l.event||'')+'</td><td>'+(l.message||'-')+'</td><td>'+((l.error_code?(l.error_code+': '+(l.error_message||'')):'-'))+'</td></tr>').join('');
+  }
+  function isTerminal(s){ return s==='completed' || s==='stopped' || s==='error'; }
+  let timer = null;
+  function poll(){
+    fetch(statusUrl).then(r=>r.json()).then(data=>{
+      statusEl.textContent = data.status || 'idle';
+      errorEl.textContent = data.status === 'error' ? ('Error ['+(data.error_code||'UnknownError')+']: '+(data.error_message||'')) : '';
+      renderLogs(data.logs || []);
+      specEl.textContent = JSON.stringify(data.conceptual_model_spec || {}, null, 2);
+      narrativeEl.textContent = data.conceptual_model_narrative || '';
+      if(isTerminal(data.status) && timer){ clearInterval(timer); timer = null; }
+    }).catch(()=>{});
+  }
+  poll();
+  timer = setInterval(poll, 2500);
+})();
+</script>
+</body>
+</html>

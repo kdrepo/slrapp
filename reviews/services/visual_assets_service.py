@@ -82,6 +82,7 @@ class VisualAssetsService:
             generated.extend(self._generate_keyword_top_terms_bar())
             generated.extend(self._generate_journal_impact())
             generated.extend(self._generate_study_characteristics_table())
+            generated.extend(self._generate_tccm_analysis_table())
             generated.extend(self._generate_quality_assessment_table())
             generated.extend(self._generate_scopus_query_strings_table())
             generated.extend(self._generate_pico_and_criteria_table())
@@ -961,6 +962,134 @@ class VisualAssetsService:
             pass
 
         return generated
+
+    def _generate_tccm_analysis_table(self):
+        scaffold = self.review.scaffold_data if isinstance(self.review.scaffold_data, dict) else {}
+        tccm = scaffold.get('tccm_summary', {}) if isinstance(scaffold.get('tccm_summary', {}), dict) else {}
+        if not tccm:
+            return []
+
+        theory = tccm.get('theory_dimension', {}) if isinstance(tccm.get('theory_dimension', {}), dict) else {}
+        chars = tccm.get('characteristics_dimension', {}) if isinstance(tccm.get('characteristics_dimension', {}), dict) else {}
+        context = tccm.get('context_dimension', {}) if isinstance(tccm.get('context_dimension', {}), dict) else {}
+        methods = tccm.get('methods_dimension', {}) if isinstance(tccm.get('methods_dimension', {}), dict) else {}
+
+        theory_dominant = theory.get('dominant_theory') or theory.get('dominant_theories', [])
+        theory_present = theory.get('theories_used') or theory.get('theories_present', {})
+        chars_dominant = chars.get('unit_of_analysis', {}).get('dominant') if isinstance(chars.get('unit_of_analysis', {}), dict) else chars.get('design_distribution', {})
+        chars_present = {
+            'sample_types': chars.get('sample_types', {}),
+            'sample_size_distribution': chars.get('sample_size_distribution', {}),
+            'journal_field_distribution': chars.get('journal_field_distribution', {}),
+        }
+        chars_absent = chars.get('unit_of_analysis', {}).get('absent', []) if isinstance(chars.get('unit_of_analysis', {}), dict) else []
+        context_dominant = context.get('geographic_distribution', [])[:3] if isinstance(context.get('geographic_distribution', []), list) else context.get('country_distribution', {})
+        context_present = {
+            'economic_context_distribution': context.get('economic_context_distribution', {}),
+            'platform_type_distribution': context.get('platform_type_distribution', {}),
+            'population_group_distribution': context.get('population_group_distribution', {}),
+        }
+        methods_dominant = methods.get('paradigm_distribution', {})
+        methods_present = {
+            'data_collection_distribution': methods.get('data_collection_distribution', {}),
+            'analysis_distribution': methods.get('analysis_distribution', {}),
+            'pre_registered_pct': methods.get('pre_registered_pct'),
+            'multi_sample_replication_pct': methods.get('multi_sample_replication_pct'),
+        }
+
+        rows = [
+            {
+                'dimension': 'Theory',
+                'findings_and_gaps': self._build_tccm_dimension_text(
+                    dominant=theory_dominant,
+                    present=theory_present,
+                    absent=theory.get('absent_theories', []),
+                    narrative=theory.get('theory_narrative', ''),
+                ),
+            },
+            {
+                'dimension': 'Characteristics',
+                'findings_and_gaps': self._build_tccm_dimension_text(
+                    dominant=chars_dominant,
+                    present=chars_present,
+                    absent=chars_absent,
+                    narrative=chars.get('characteristics_narrative', ''),
+                ),
+            },
+            {
+                'dimension': 'Context',
+                'findings_and_gaps': self._build_tccm_dimension_text(
+                    dominant=context_dominant,
+                    present=context_present,
+                    absent=(context.get('underrepresented_regions', []) or []) + (context.get('underrepresented_populations', []) or []),
+                    narrative=context.get('context_narrative', ''),
+                ),
+            },
+            {
+                'dimension': 'Methods',
+                'findings_and_gaps': self._build_tccm_dimension_text(
+                    dominant=methods_dominant,
+                    present=methods_present,
+                    absent=methods.get('absent_methods', []),
+                    narrative=methods.get('methods_narrative', ''),
+                ),
+            },
+        ]
+
+        out_json = self.assets_dir / 'table_tccm_analysis.json'
+        out_json.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding='utf-8')
+        generated = [out_json.name]
+
+        try:
+            import plotly.graph_objects as go
+            fig = go.Figure(
+                data=[
+                    go.Table(
+                        header=self._table_header(['Dimension', 'Findings and Gaps']),
+                        cells=self._table_cells(
+                            [
+                                [r['dimension'] for r in rows],
+                                [self._truncate(r['findings_and_gaps'], 1000) for r in rows],
+                            ],
+                            height=55,
+                        ),
+                    )
+                ]
+            )
+            self._apply_figure_layout(fig, 'TCCM Analysis Table', height=900, margin={'l': 20, 'r': 20, 't': 80, 'b': 20})
+            html_path = self.assets_dir / 'table_tccm_analysis.html'
+            fig.write_html(str(html_path), include_plotlyjs='cdn', full_html=True)
+            generated.append(html_path.name)
+        except Exception:
+            pass
+
+        return generated
+
+    def _build_tccm_dimension_text(self, dominant, present, absent, narrative):
+        parts = []
+        dominant_text = self._format_tccm_value(dominant)
+        present_text = self._format_tccm_value(present)
+        absent_text = self._format_tccm_value(absent)
+        if dominant_text:
+            parts.append(f'Dominant: {dominant_text}')
+        if present_text:
+            parts.append(f'Present: {present_text}')
+        if absent_text:
+            parts.append(f'Absent/Gaps: {absent_text}')
+        n = str(narrative or '').strip()
+        if n:
+            parts.append(f'Narrative: {n}')
+        return ' | '.join(parts)
+
+    def _format_tccm_value(self, value):
+        if isinstance(value, dict):
+            chunks = []
+            for key, val in value.items():
+                chunks.append(f'{key}: {val}')
+            return '; '.join(chunks)
+        if isinstance(value, list):
+            return '; '.join(str(x) for x in value if str(x).strip())
+        return str(value or '').strip()
 
     def _generate_pico_and_criteria_table(self):
         rows = [

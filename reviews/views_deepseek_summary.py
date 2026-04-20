@@ -41,6 +41,7 @@ class DeepSeekSummeryMonitorView(View):
             return redirect('reviews:deepseek-summery-monitor', pk=review.pk)
 
         retry_failed_only = action == 'retry_failed'
+        rerun_done_only = action == 'replace_extraction'
         initial = {
             'status': 'running',
             'started_at': timezone.now().isoformat(),
@@ -54,14 +55,17 @@ class DeepSeekSummeryMonitorView(View):
             'error_traceback': '',
             'logs': [],
             'retry_failed_only': retry_failed_only,
+            'rerun_done_only': rerun_done_only,
         }
         _set_stage(review, initial)
 
-        worker = threading.Thread(target=_run_async, args=(review.pk, retry_failed_only), daemon=True)
+        worker = threading.Thread(target=_run_async, args=(review.pk, retry_failed_only, rerun_done_only), daemon=True)
         worker.start()
 
         if retry_failed_only:
             messages.success(request, 'DeepSeek summery retry for failed papers started.')
+        elif rerun_done_only:
+            messages.success(request, 'DeepSeek replace extraction started for done papers.')
         else:
             messages.success(request, 'DeepSeek summery extraction started.')
         return redirect('reviews:deepseek-summery-monitor', pk=review.pk)
@@ -75,7 +79,7 @@ class DeepSeekSummeryStatusView(View):
         return JsonResponse(payload)
 
 
-def _run_async(review_id, retry_failed_only):
+def _run_async(review_id, retry_failed_only, rerun_done_only):
     def _should_stop():
         review = Review.objects.get(pk=review_id)
         stage = _get_stage(review)
@@ -115,6 +119,7 @@ def _run_async(review_id, retry_failed_only):
             progress_callback=_progress,
             stop_check=_should_stop,
             retry_failed_only=retry_failed_only,
+            rerun_done_only=rerun_done_only,
         )
 
         review = Review.objects.get(pk=review_id)
@@ -162,6 +167,7 @@ def _completed_rows(review):
         'full_text_summery',
         'full_text_extraction',
         'full_text_quality',
+        'full_text_tccm',
     )
 
     output = []
@@ -169,6 +175,7 @@ def _completed_rows(review):
         summary_data = row.get('full_text_summery')
         extraction_data = row.get('full_text_extraction')
         quality_data = row.get('full_text_quality')
+        tccm_data = row.get('full_text_tccm')
 
         summary_text = ''
         if isinstance(summary_data, str):
@@ -182,6 +189,33 @@ def _completed_rows(review):
             total_score = quality_data.get('total_score', '')
             risk_of_bias = quality_data.get('risk_of_bias', '')
 
+        theoretical_frameworks = []
+        if isinstance(extraction_data, dict):
+            tf = extraction_data.get('theoretical_frameworks')
+            if isinstance(tf, list):
+                theoretical_frameworks = [item for item in tf if isinstance(item, dict)]
+        theoretical_framework_count = len(theoretical_frameworks)
+        top_theories = []
+        for item in theoretical_frameworks:
+            theory_name = str(item.get('theory_name') or '').strip()
+            if theory_name:
+                top_theories.append(theory_name)
+            if len(top_theories) >= 3:
+                break
+
+        tccm_theory_count = 0
+        tccm_has_characteristics = False
+        tccm_has_context = False
+        tccm_has_methods = False
+        has_tccm = isinstance(tccm_data, dict) and bool(tccm_data)
+        if isinstance(tccm_data, dict):
+            tccm_theories = tccm_data.get('theories')
+            if isinstance(tccm_theories, list):
+                tccm_theory_count = len([item for item in tccm_theories if isinstance(item, dict)])
+            tccm_has_characteristics = isinstance(tccm_data.get('characteristics'), dict) and bool(tccm_data.get('characteristics'))
+            tccm_has_context = isinstance(tccm_data.get('context'), dict) and bool(tccm_data.get('context'))
+            tccm_has_methods = isinstance(tccm_data.get('methods'), dict) and bool(tccm_data.get('methods'))
+
         output.append(
             {
                 'id': row['id'],
@@ -194,6 +228,13 @@ def _completed_rows(review):
                 'has_quality': isinstance(quality_data, dict) and bool(quality_data),
                 'quality_total_score': total_score,
                 'quality_risk_of_bias': risk_of_bias,
+                'theoretical_framework_count': theoretical_framework_count,
+                'top_theories': '; '.join(top_theories),
+                'has_tccm': has_tccm,
+                'tccm_theory_count': tccm_theory_count,
+                'tccm_has_characteristics': tccm_has_characteristics,
+                'tccm_has_context': tccm_has_context,
+                'tccm_has_methods': tccm_has_methods,
             }
         )
 

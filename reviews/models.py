@@ -189,6 +189,7 @@ class Paper(models.Model):
     full_text_summery = models.JSONField(default=dict, blank=True)
     full_text_extraction = models.JSONField(default=dict, blank=True)
     full_text_quality = models.JSONField(default=dict, blank=True)
+    full_text_tccm = models.JSONField(default=dict, blank=True)
     full_text_summery_status = models.CharField(max_length=32, blank=True)
     full_text_summery_error = models.TextField(blank=True)
     full_text_summery_updated_at = models.DateTimeField(null=True, blank=True)

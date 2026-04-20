@@ -138,6 +138,22 @@ LOCKED THEME NAMES - use exactly as written, never paraphrase:
 LOCKED EVIDENCE GRADES (by theme):
 {evidence_grades}
 
+THEORETICAL FRAMEWORK (locked):
+  Primary lens: {theory_primary_lens}
+  Supporting lenses: {theory_supporting_lenses}
+  Dominant theory: {theory_dominant}
+  Coverage: {theory_coverage}
+  Gaps: {theory_gaps}
+  Landscape summary: {theory_landscape_summary}
+
+THEORETICAL SYNTHESIS (locked):
+Third-order synthesis:
+{third_order_synthesis}
+Propositions:
+{propositions_formatted}
+Revised framework narrative:
+{revised_framework_narrative}
+
 QUALITY SUMMARY (locked):
 {quality_summary}
 
@@ -151,13 +167,13 @@ EVIDENCE LANGUAGE RULES - apply based on each theme's grade:
   Established (>=60% corpus, multiple designs):
     Use: 'demonstrates', 'establishes', 'consistently shows', 'confirms'
     Do not use: 'suggests', 'indicates', 'appears to'
-  Emerging (30-60%, mostly one design):
+  Emerging (10-60%, mostly one design):
     Use: 'suggests', 'indicates', 'growing evidence shows'
     Do not use: 'demonstrates', 'establishes', 'confirms'
   Contested (contradictory findings):
     Use: 'remains debated', 'evidence is mixed', 'findings diverge'
     Do not use language implying consensus
-  Insufficient (<=2 papers or <30% corpus):
+  Insufficient (<10% corpus):
     Use: 'preliminary evidence suggests', 'limited evidence indicates'
     Always follow with: flag as research gap
     Do not use any other strength language

@@ -56,7 +56,7 @@ Step 4 — Assign an evidence grade using these exact criteria:
     - AND findings are broadly convergent across multiple study designs
 
   EMERGING:
-    - 30% to 59% of included papers ({emerging_min} to {emerging_max} papers)
+    - 10% to 59% of included papers ({emerging_min} to {emerging_max} papers)
     - OR findings come predominantly from one study design
 
   CONTESTED:
@@ -64,8 +64,7 @@ Step 4 — Assign an evidence grade using these exact criteria:
     - Contradictions are substantive (opposite directions of effect)
 
   INSUFFICIENT:
-    - Fewer than 30% of included papers (fewer than {insufficient_threshold} papers)
-    - OR only 1-2 papers total address this theme
+    - Fewer than 10% of included papers (fewer than {insufficient_threshold} papers)
 
 Step 5 — Order themes by paper_count descending (most-evidenced first).
 

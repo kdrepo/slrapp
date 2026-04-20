@@ -18,17 +18,9 @@ Structure as continuous prose:
 6. Situate findings in broader literature framing (without non-registry citations).
 7. Practice/policy implications.
 8. Evidence-base limitations (not review limitations).
-9. Integrate conceptual model explicitly:
-   - Refer explicitly to the conceptual model using the payload fields:
-     conceptual_model_title, conceptual_model_narrative, conceptual_model_core_nodes,
-     conceptual_model_relationships, conceptual_model_moderating_relationships.
-   - Include at least one sentence that interprets how the model connects antecedents,
-     mediators/moderators, and outcomes.
-   - Use publication-style phrasing, not process/meta phrasing.
-   - Mention the model figure placeholder naturally in prose where relevant.
 
 Requirements:
-- 1200-1500 words
+- 1000-1300 words
 - Interpretive synthesis, not raw restatement
 - Any citation must be from paper registry
 - No bullet points in output

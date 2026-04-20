@@ -1,5 +1,6 @@
 import json
 import os
+import math
 from json import JSONDecodeError
 
 import requests
@@ -87,9 +88,9 @@ def synthesize_themes_for_review(review_id):
         raise RuntimeError('No included papers with full_text_extraction found.')
 
     established_threshold = round(total_papers * 0.60)
-    emerging_min = round(total_papers * 0.30)
+    emerging_min = max(1, math.ceil(total_papers * 0.10))
     emerging_max = established_threshold - 1
-    insufficient_threshold = emerging_min
+    insufficient_threshold = max(1, math.ceil(total_papers * 0.10))
 
     rq_items = list(review.research_questions.order_by('id'))
     rq_list_numbered = '\n'.join(
@@ -245,6 +246,13 @@ def _normalize_themes(themes, valid_paper_ids, total_papers):
             }
         )
 
+    for row in normalized:
+        row['evidence_grade'] = _coerce_evidence_grade(
+            requested_grade=row.get('evidence_grade'),
+            paper_count=int(row.get('paper_count') or 0),
+            pct_of_corpus=float(row.get('pct_of_corpus') or 0.0),
+        )
+
     normalized.sort(key=lambda x: x.get('paper_count', 0), reverse=True)
     return normalized
 
@@ -316,6 +324,18 @@ def _normalize_evidence_grade(value):
     if text == 'contested':
         return ThemeSynthesis.EvidenceGrade.CONTESTED
     if text == 'insufficient':
+        return ThemeSynthesis.EvidenceGrade.INSUFFICIENT
+    return ThemeSynthesis.EvidenceGrade.EMERGING
+
+
+def _coerce_evidence_grade(requested_grade, paper_count, pct_of_corpus):
+    text = _safe_text(requested_grade).lower()
+
+    if text == 'contested':
+        return ThemeSynthesis.EvidenceGrade.CONTESTED
+    if pct_of_corpus >= 60.0:
+        return ThemeSynthesis.EvidenceGrade.ESTABLISHED
+    if pct_of_corpus < 10.0:
         return ThemeSynthesis.EvidenceGrade.INSUFFICIENT
     return ThemeSynthesis.EvidenceGrade.EMERGING
 

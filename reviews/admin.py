@@ -1,4 +1,7 @@
+import json
+
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import (
     LitPaper,
@@ -39,10 +42,18 @@ class SearchQueryFocusFilter(admin.SimpleListFilter):
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = ('title', 'status', 'theme_synthesis_status', 'theme_synthesis_updated_at')
+    list_display = ('id','title', 'status', 'theme_synthesis_status', 'theme_synthesis_updated_at')
     list_filter = ('status', 'theme_synthesis_status')
     search_fields = ('title', 'objectives', 'theme_synthesis_error')
-    readonly_fields = ('theme_synthesis_updated_at',)
+    readonly_fields = (
+        'theme_synthesis_updated_at',
+        'scaffold_data_pretty',
+        'theory_landscape_json',
+        'theoretical_synthesis_json',
+        'propositions_json',
+        'conceptual_model_spec_json',
+        'tccm_summary_json',
+    )
     inlines = [ResearchQuestionInline, SearchQueryInline]
 
     fieldsets = (
@@ -50,6 +61,7 @@ class ReviewAdmin(admin.ModelAdmin):
             'Review Core',
             {
                 'fields': (
+                    
                     'title',
                     'status',
                     'objectives',
@@ -87,12 +99,63 @@ class ReviewAdmin(admin.ModelAdmin):
                 'classes': ('collapse',),
                 'fields': (
                     'stage_progress',
+                    'scaffold_data_pretty',
                     'scaffold_data',
                     'scaffold_preamble_template',
                 )
             },
         ),
+        (
+            'Scaffold: Theory / TCCM / Conceptual',
+            {
+                'classes': ('collapse',),
+                'fields': (
+                    'theory_landscape_json',
+                    'theoretical_synthesis_json',
+                    'propositions_json',
+                    'conceptual_model_spec_json',
+                    'tccm_summary_json',
+                ),
+            },
+        ),
     )
+
+    @admin.display(description='Scaffold theory_landscape')
+    def theory_landscape_json(self, obj):
+        data = obj.scaffold_data if isinstance(obj.scaffold_data, dict) else {}
+        value = data.get('theory_landscape', {})
+        return json.dumps(value, ensure_ascii=False, indent=2)
+
+    @admin.display(description='Scaffold data (pretty)')
+    def scaffold_data_pretty(self, obj):
+        value = obj.scaffold_data if isinstance(obj.scaffold_data, dict) else {}
+        pretty = json.dumps(value, ensure_ascii=False, indent=2)
+        return format_html('<pre style="white-space: pre-wrap; margin: 0;">{}</pre>', pretty)
+
+    @admin.display(description='Scaffold theoretical_synthesis')
+    def theoretical_synthesis_json(self, obj):
+        data = obj.scaffold_data if isinstance(obj.scaffold_data, dict) else {}
+        value = data.get('theoretical_synthesis', {})
+        return json.dumps(value, ensure_ascii=False, indent=2)
+
+    @admin.display(description='Scaffold propositions')
+    def propositions_json(self, obj):
+        data = obj.scaffold_data if isinstance(obj.scaffold_data, dict) else {}
+        ts = data.get('theoretical_synthesis', {}) if isinstance(data.get('theoretical_synthesis', {}), dict) else {}
+        value = ts.get('propositions', []) if isinstance(ts.get('propositions', []), list) else []
+        return json.dumps(value, ensure_ascii=False, indent=2)
+
+    @admin.display(description='Scaffold conceptual_model_spec')
+    def conceptual_model_spec_json(self, obj):
+        data = obj.scaffold_data if isinstance(obj.scaffold_data, dict) else {}
+        value = data.get('conceptual_model_spec', {})
+        return json.dumps(value, ensure_ascii=False, indent=2)
+
+    @admin.display(description='Scaffold tccm_summary')
+    def tccm_summary_json(self, obj):
+        data = obj.scaffold_data if isinstance(obj.scaffold_data, dict) else {}
+        value = data.get('tccm_summary', {})
+        return json.dumps(value, ensure_ascii=False, indent=2)
 
 
 @admin.register(ResearchQuestion)
@@ -296,6 +359,7 @@ class PaperAdmin(admin.ModelAdmin):
                     'full_text_summery',
                     'full_text_extraction',
                     'full_text_quality',
+                    'full_text_tccm',
                 )
             },
         ),

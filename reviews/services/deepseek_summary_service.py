@@ -14,7 +14,7 @@ from reviews.services.design_canonicalizer import canonicalize_study_design
 
 DEFAULT_SUMMERY_PROMPT = '''You are a systematic review researcher extracting data from an academic paper.
 
-Read the paper text carefully and return a single JSON object with exactly three top-level keys: "summary", "extraction", and "quality".
+Read the paper text carefully and return a single JSON object with exactly four top-level keys: "summary", "extraction", "quality", and "tccm".
 
 Return ONLY valid JSON. No preamble. No explanation. No markdown fences.
 Do not add trailing commas. Start with { and end with }.
@@ -35,6 +35,13 @@ Do not add trailing commas. Start with { and end with }.
     "key_variables": "",
     "methodology": "",
     "theory_framework": "",
+    "theoretical_frameworks": [
+      {
+        "theory_name": "",
+        "usage_type": "primary | secondary | implicit",
+        "how_used": ""
+      }
+    ],
     "key_findings": {
       "summary": "",
       "structure": [
@@ -63,6 +70,40 @@ Do not add trailing commas. Start with { and end with }.
     "risk_of_bias": "low | moderate | high",
     "strengths": ["strength 1", "strength 2", "strength 3"],
     "weaknesses": ["weakness 1", "weakness 2", "weakness 3"]
+  },
+  "tccm": {
+    "theories": [
+      {
+        "theory_name": "",
+        "theory_abbreviation": null,
+        "usage_type": "primary | secondary | implicit",
+        "usage_description": ""
+      }
+    ],
+    "characteristics": {
+      "unit_of_analysis": "",
+      "sample_type": "",
+      "longitudinal": false,
+      "experimental": false,
+      "sample_size_category": "",
+      "publication_type": "",
+      "journal_field": ""
+    },
+    "context": {
+      "geographic_scope": "",
+      "country_or_region": "",
+      "economic_context": "",
+      "digital_platform_type": "",
+      "population_group": "",
+      "temporal_context": ""
+    },
+    "methods": {
+      "research_paradigm": "",
+      "data_collection": "",
+      "primary_analysis": "",
+      "software_used": "",
+      "validation_approach": ""
+    }
   }
 }
 
@@ -137,14 +178,24 @@ risk_of_bias: low = 8-10 | moderate = 5-7 | high = 0-4
 
 JSON_CORRECTION_PROMPT = (
     'Your previous response was not valid JSON. Return ONLY valid JSON object from that response, '
-    'with exactly three top-level keys: "summary", "extraction", and "quality".\n'
+    'with exactly four top-level keys: "summary", "extraction", "quality", and "tccm".\n'
     'Original response:\n{raw_response}'
 )
 
 
-def run_deepseek_summery_for_review(review_id, progress_callback=None, stop_check=None, retry_failed_only=False):
+def run_deepseek_summery_for_review(
+    review_id,
+    progress_callback=None,
+    stop_check=None,
+    retry_failed_only=False,
+    rerun_done_only=False,
+):
     review = Review.objects.get(pk=review_id)
-    papers = _eligible_papers(review=review, retry_failed_only=retry_failed_only)
+    papers = _eligible_papers(
+        review=review,
+        retry_failed_only=retry_failed_only,
+        rerun_done_only=rerun_done_only,
+    )
     _emit(progress_callback, {'event': 'started', 'targeted': len(papers), 'paper_ids': [p.id for p in papers]})
 
     processed_ids = []
@@ -204,13 +255,15 @@ def run_deepseek_summery_for_review(review_id, progress_callback=None, stop_chec
     }
 
 
-def _eligible_papers(review, retry_failed_only=False):
+def _eligible_papers(review, retry_failed_only=False, rerun_done_only=False):
     qs = review.papers.filter(
         full_text_decision=Paper.FullTextDecision.INCLUDED,
         fulltext_retrieved=True,
     ).order_by('id')
 
-    if retry_failed_only:
+    if rerun_done_only:
+        qs = qs.filter(full_text_summery_status='done')
+    elif retry_failed_only:
         qs = qs.filter(full_text_summery_status='failed')
     else:
         qs = qs.exclude(full_text_summery_status='done')
@@ -253,6 +306,7 @@ def _extract_summary_with_deepseek(paper_text):
     summary = payload.get('summary')
     extraction = payload.get('extraction')
     quality = payload.get('quality')
+    tccm = payload.get('tccm')
 
     if not isinstance(summary, str) or not summary.strip():
         raise RuntimeError('DeepSeek output missing valid "summary" text.')
@@ -262,13 +316,17 @@ def _extract_summary_with_deepseek(paper_text):
 
     if not isinstance(quality, dict):
         raise RuntimeError('DeepSeek output missing valid "quality" object.')
+    if not isinstance(tccm, dict):
+        tccm = {}
 
     quality = _normalize_quality(quality)
+    tccm = _normalize_tccm(tccm, extraction)
 
     return {
         'summary': summary.strip(),
         'extraction': extraction,
         'quality': quality,
+        'tccm': tccm,
     }
 
 
@@ -330,13 +388,16 @@ def _normalize_quality(quality):
 def _save_summary_payload(paper, payload):
     extraction = payload['extraction'] if isinstance(payload.get('extraction'), dict) else {}
     quality = payload['quality'] if isinstance(payload.get('quality'), dict) else {}
+    tccm = payload['tccm'] if isinstance(payload.get('tccm'), dict) else {}
 
     raw_design = str(extraction.get('study_design') or quality.get('study_type') or '').strip()
     extraction['study_design_canonical'] = canonicalize_study_design(raw_design)
+    extraction['theoretical_frameworks'] = _normalize_theoretical_frameworks(extraction)
 
     paper.full_text_summery = payload['summary']
     paper.full_text_extraction = extraction
     paper.full_text_quality = quality
+    paper.full_text_tccm = tccm
     paper.full_text_summery_status = 'done'
     paper.full_text_summery_error = ''
     paper.full_text_summery_updated_at = timezone.now()
@@ -345,11 +406,118 @@ def _save_summary_payload(paper, payload):
             'full_text_summery',
             'full_text_extraction',
             'full_text_quality',
+            'full_text_tccm',
             'full_text_summery_status',
             'full_text_summery_error',
             'full_text_summery_updated_at',
         ]
     )
+
+
+def _normalize_tccm(tccm, extraction):
+    if not isinstance(tccm, dict):
+        tccm = {}
+
+    theories = tccm.get('theories')
+    normalized_theories = []
+    if isinstance(theories, list):
+        for row in theories:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get('theory_name') or '').strip()
+            if not name:
+                continue
+            usage = str(row.get('usage_type') or 'secondary').strip().lower()
+            if usage not in {'primary', 'secondary', 'implicit'}:
+                usage = 'secondary'
+            normalized_theories.append(
+                {
+                    'theory_name': name,
+                    'theory_abbreviation': (
+                        str(row.get('theory_abbreviation')).strip()
+                        if row.get('theory_abbreviation') not in (None, '', 'null')
+                        else None
+                    ),
+                    'usage_type': usage,
+                    'usage_description': str(row.get('usage_description') or '').strip(),
+                }
+            )
+
+    if not normalized_theories:
+        fallback_theories = _normalize_theoretical_frameworks(extraction)
+        for th in fallback_theories:
+            normalized_theories.append(
+                {
+                    'theory_name': str(th.get('theory_name') or '').strip(),
+                    'theory_abbreviation': None,
+                    'usage_type': str(th.get('usage_type') or 'secondary').strip(),
+                    'usage_description': str(th.get('how_used') or '').strip(),
+                }
+            )
+
+    characteristics = tccm.get('characteristics') if isinstance(tccm.get('characteristics'), dict) else {}
+    context = tccm.get('context') if isinstance(tccm.get('context'), dict) else {}
+    methods = tccm.get('methods') if isinstance(tccm.get('methods'), dict) else {}
+
+    return {
+        'theories': normalized_theories,
+        'characteristics': {
+            'unit_of_analysis': str(characteristics.get('unit_of_analysis') or '').strip(),
+            'sample_type': str(characteristics.get('sample_type') or '').strip(),
+            'longitudinal': bool(characteristics.get('longitudinal')),
+            'experimental': bool(characteristics.get('experimental')),
+            'sample_size_category': str(characteristics.get('sample_size_category') or '').strip(),
+            'publication_type': str(characteristics.get('publication_type') or '').strip(),
+            'journal_field': str(characteristics.get('journal_field') or '').strip(),
+        },
+        'context': {
+            'geographic_scope': str(context.get('geographic_scope') or '').strip(),
+            'country_or_region': str(context.get('country_or_region') or '').strip(),
+            'economic_context': str(context.get('economic_context') or '').strip(),
+            'digital_platform_type': str(context.get('digital_platform_type') or '').strip(),
+            'population_group': str(context.get('population_group') or '').strip(),
+            'temporal_context': str(context.get('temporal_context') or '').strip(),
+        },
+        'methods': {
+            'research_paradigm': str(methods.get('research_paradigm') or '').strip(),
+            'data_collection': str(methods.get('data_collection') or '').strip(),
+            'primary_analysis': str(methods.get('primary_analysis') or '').strip(),
+            'software_used': str(methods.get('software_used') or '').strip(),
+            'validation_approach': str(methods.get('validation_approach') or '').strip(),
+        },
+    }
+
+
+def _normalize_theoretical_frameworks(extraction):
+    raw = extraction.get('theoretical_frameworks')
+    normalized = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            theory_name = str(item.get('theory_name') or '').strip()
+            if not theory_name:
+                continue
+            usage_type = str(item.get('usage_type') or 'secondary').strip().lower()
+            if usage_type not in {'primary', 'secondary', 'implicit'}:
+                usage_type = 'secondary'
+            how_used = str(item.get('how_used') or '').strip()
+            normalized.append(
+                {
+                    'theory_name': theory_name,
+                    'usage_type': usage_type,
+                    'how_used': how_used,
+                }
+            )
+
+    if normalized:
+        return normalized
+
+    # Backward compatibility from older single-field extraction schema.
+    legacy = str(extraction.get('theory_framework') or '').strip()
+    if legacy:
+        return [{'theory_name': legacy, 'usage_type': 'secondary', 'how_used': ''}]
+    return []
 
 
 def _call_deepseek(prompt):
@@ -369,7 +537,7 @@ def _call_deepseek(prompt):
     payload = {
         'model': model_name,
         'messages': [
-            {'role': 'system', 'content': 'Return only valid JSON with keys summary, extraction, and quality.'},
+            {'role': 'system', 'content': 'Return only valid JSON with keys summary, extraction, quality, and tccm.'},
             {'role': 'user', 'content': prompt},
         ],
         'temperature': 0.0,

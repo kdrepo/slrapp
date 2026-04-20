@@ -3,7 +3,7 @@
 
 You are a systematic review researcher extracting data from an academic paper.
 
-Read the paper text carefully and return a single JSON object with exactly three top-level keys: "summary", "extraction", and "quality".
+Read the paper text carefully and return a single JSON object with exactly four top-level keys: "summary", "extraction", "quality", and "tccm".
 
 Return ONLY valid JSON. No preamble. No explanation. No markdown fences.
 Do not add trailing commas. Start with { and end with }.
@@ -24,6 +24,13 @@ Do not add trailing commas. Start with { and end with }.
     "key_variables": "",
     "methodology": "",
     "theory_framework": "",
+    "theoretical_frameworks": [
+      {
+        "theory_name": "name of theory used or referenced",
+        "usage_type": "primary | secondary | implicit",
+        "how_used": "one sentence — does this paper test, extend, challenge, or apply the theory?"
+      }
+    ],
     "key_findings": {
       "summary": "",
       "structure": [
@@ -52,6 +59,40 @@ Do not add trailing commas. Start with { and end with }.
     "risk_of_bias": "low | moderate | high",
     "strengths": ["strength 1", "strength 2", "strength 3"],
     "weaknesses": ["weakness 1", "weakness 2", "weakness 3"]
+  },
+  "tccm": {
+    "theories": [
+      {
+        "theory_name": "exact name of theory used or referenced",
+        "theory_abbreviation": "e.g. CLT, SCT, TAM — or null",
+        "usage_type": "primary | secondary | implicit",
+        "usage_description": "one sentence — does this paper test, extend, challenge, or apply this theory?"
+      }
+    ],
+    "characteristics": {
+      "unit_of_analysis": "individual | dyad | organisation | market | platform | policy | other",
+      "sample_type": "student | consumer panel | general population | clinical | organisational | secondary data | other",
+      "longitudinal": false,
+      "experimental": false,
+      "sample_size_category": "small (<100) | medium (100-499) | large (500-1999) | very large (2000+) | not applicable",
+      "publication_type": "journal article | conference paper | book chapter | working paper",
+      "journal_field": "marketing | consumer behaviour | information systems | psychology | economics | policy | interdisciplinary | other"
+    },
+    "context": {
+      "geographic_scope": "single country | multi-country | global",
+      "country_or_region": "country name or region — be specific",
+      "economic_context": "developed | developing | emerging | mixed",
+      "digital_platform_type": "e-commerce | social media | financial services | sharing economy | search engine | general digital | not specified",
+      "population_group": "general consumers | elderly | low income | young adults | disability | gender-specific | cross-group | not specified",
+      "temporal_context": "pre-2015 | 2015-2019 | 2020-2024 | longitudinal spanning periods"
+    },
+    "methods": {
+      "research_paradigm": "quantitative | qualitative | mixed",
+      "data_collection": "survey | experiment | interview | focus group | observation | secondary data | content analysis | multiple",
+      "primary_analysis": "regression | SEM | content analysis | thematic analysis | grounded theory | case study analysis | meta-analysis | descriptive | other",
+      "software_used": "SPSS | R | Mplus | AMOS | NVivo | ATLAS.ti | Stata | Python | not reported | other",
+      "validation_approach": "pre-registered | piloted | multi-sample replication | single sample | not reported"
+    }
   }
 }
 

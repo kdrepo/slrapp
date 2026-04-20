@@ -22,6 +22,31 @@
   <div class="card">
     <h1>Phase 23: Ghostwriter</h1>
     <p>Review: <strong>{{ review.title }}</strong></p>
+    <form method="post" style="margin-bottom: 0.8rem;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_options">
+      <label style="margin-right:1rem;">
+        <input type="checkbox" name="include_theoretical_framework" {% if options.include_theoretical_framework %}checked{% endif %}>
+        Include Theoretical Framework Anchoring (3.7, 3.8)
+      </label>
+      <label style="margin-right:1rem;">
+        <input type="checkbox" name="include_conceptual_model" {% if options.include_conceptual_model %}checked{% endif %}>
+        Include Conceptual Model Integration (Discussion)
+      </label>
+      <label style="margin-right:1rem;">
+        <input type="checkbox" name="include_tccm" {% if options.include_tccm %}checked{% endif %}>
+        Include TCCM Analysis (3.2b)
+      </label>
+      <label style="margin-right:1rem;">
+        <input type="checkbox" name="include_future_research" {% if options.include_future_research %}checked{% endif %}>
+        Include Future Research Agenda (Section 6)
+      </label>
+      <label style="margin-right:1rem;">
+        <input type="checkbox" name="include_sensitivity" {% if options.include_sensitivity %}checked{% endif %}>
+        Include Sensitivity Analysis (Section 3.6.4)
+      </label>
+      <button type="submit">Save Writing Options</button>
+    </form>
     <form method="post">
       {% csrf_token %}
       <button type="submit" name="action" value="write_next">Write Next Step</button>
@@ -41,29 +66,43 @@
   </div>
 
   <div class="card">
+    <h2>Active TOC (Based on Options)</h2>
+    <ol id="toc-list">
+      {% for line in active_toc %}
+        <li>{{ line }}</li>
+      {% empty %}
+        <li>No active sections.</li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  <div class="card">
     <h2>Section-by-Section Writing</h2>
     <table>
-      <thead><tr><th>Section</th><th>Status</th><th>Words</th><th>Updated</th><th>Error</th><th>Action</th><th>Preview</th></tr></thead>
+      <thead><tr><th>Section</th><th>Included</th><th>Status</th><th>Words</th><th>Updated</th><th>Error</th><th>Action</th><th>Preview</th></tr></thead>
       <tbody id="sections-body">
       {% for s in sections %}
         <tr>
           <td>{{ s.name }}</td>
+          <td>{% if s.included %}Yes{% else %}No{% endif %}</td>
           <td>{{ s.status }}</td>
           <td>{{ s.word_count }}</td>
           <td>{{ s.updated_at|default:'-' }}</td>
           <td>{{ s.error|default:'-' }}</td>
           <td>
+            {% if s.included %}
             <form method="post" style="display:inline;">
               {% csrf_token %}
               <input type="hidden" name="action" value="write_section">
               <input type="hidden" name="section_key" value="{{ s.key }}">
               <button type="submit">Write/Retry</button>
             </form>
+            {% else %}-{% endif %}
           </td>
           <td>{{ s.text_preview }}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="7">No section state yet.</td></tr>
+        <tr><td colspan="8">No section state yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -105,6 +144,7 @@
   const logsBody = document.getElementById('logs-body');
   const sectionsBody = document.getElementById('sections-body');
   const compiledEl = document.getElementById('compiled');
+  const tocList = document.getElementById('toc-list');
 
   function renderLogs(logs){
     if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
@@ -112,16 +152,24 @@
   }
 
   function renderSections(rows){
-    if(!rows || !rows.length){ sectionsBody.innerHTML='<tr><td colspan="7">No section state yet.</td></tr>'; return; }
+    if(!rows || !rows.length){ sectionsBody.innerHTML='<tr><td colspan="8">No section state yet.</td></tr>'; return; }
     sectionsBody.innerHTML = rows.map(s => {
-      const action = '<form method="post" action="'+monitorUrl+'" style="display:inline;">'
+      const action = !s.included ? '-' : ('<form method="post" action="'+monitorUrl+'" style="display:inline;">'
         + '<input type="hidden" name="csrfmiddlewaretoken" value="'+csrfToken+'">'
         + '<input type="hidden" name="action" value="write_section">'
         + '<input type="hidden" name="section_key" value="'+(s.key||'')+'">'
         + '<button type="submit">Write/Retry</button>'
-        + '</form>';
-      return '<tr><td>'+ (s.name||'') +'</td><td>'+ (s.status||'pending') +'</td><td>'+ (s.word_count||0) +'</td><td>'+ (s.updated_at||'-') +'</td><td>'+ (s.error||'-') +'</td><td>'+action+'</td><td>'+ (s.text_preview||'') +'</td></tr>';
+        + '</form>');
+      return '<tr><td>'+ (s.name||'') +'</td><td>'+ (s.included ? 'Yes' : 'No') +'</td><td>'+ (s.status||'pending') +'</td><td>'+ (s.word_count||0) +'</td><td>'+ (s.updated_at||'-') +'</td><td>'+ (s.error||'-') +'</td><td>'+action+'</td><td>'+ (s.text_preview||'') +'</td></tr>';
     }).join('');
+  }
+
+  function renderToc(lines){
+    if(!lines || !lines.length){
+      tocList.innerHTML = '<li>No active sections.</li>';
+      return;
+    }
+    tocList.innerHTML = lines.map(x => '<li>'+(x||'')+'</li>').join('');
   }
 
   function isTerminal(s){ return s==='completed' || s==='stopped' || s==='error' || s==='idle'; }
@@ -133,6 +181,7 @@
       errorEl.textContent = data.status === 'error' ? ('Error ['+(data.error_code||'UnknownError')+']: '+(data.error_message||'')) : '';
       renderLogs(data.logs || []);
       renderSections(data.sections_ordered || []);
+      renderToc(data.active_toc || []);
       compiledEl.textContent = data.compiled_draft || '';
       if(isTerminal(data.status) && timer){ clearInterval(timer); timer = null; }
     }).catch(()=>{ errorEl.textContent = 'Status polling failed. Retrying...'; });
