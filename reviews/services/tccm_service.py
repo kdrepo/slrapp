@@ -20,11 +20,13 @@ def run_tccm_aggregation_for_review(review_id):
     prompt = render_prompt_template(
         'phase_20_tccm_aggregation.md',
         context={
+            'research_context': _research_context(review),
             'primary_topic': review.title or '',
             'objectives': review.objectives or '',
             'rq_list': rq_list,
             'total_papers': len(corpus),
             'date_range': _date_range_text(review),
+            'all_tccm_extractions_json': json.dumps(corpus, ensure_ascii=False, indent=2),
             'all_tccm_json': json.dumps(corpus, ensure_ascii=False, indent=2),
         },
     )
@@ -171,6 +173,15 @@ def _rq_list(review):
     if not questions:
         return 'No research questions available.'
     return '\n'.join(f'RQ{i + 1}: {text}' for i, text in enumerate(questions))
+
+
+def _research_context(review):
+    scaffold = get_scaffold_data(review)
+    review_meta = scaffold.get('review_metadata', {}) if isinstance(scaffold.get('review_metadata', {}), dict) else {}
+    text = str(review_meta.get('research_context') or '').strip()
+    if text:
+        return text
+    return str(review.title or '').strip()
 
 
 def _parse_with_correction(raw_response):

@@ -13,18 +13,16 @@ from reviews.services.scaffold_service import get_scaffold_data, get_scaffold_pr
 from reviews.services.sensitivity_service import get_or_compute_sensitivity_results
 
 
-GHOSTWRITER_SHELL_FALLBACK = """{scaffold_preamble}
+GHOSTWRITER_SHELL_FALLBACK = """GLOBAL SCOPE (INTRODUCTION):
+{global_intro_text}
 
-TASK: ACADEMIC MANUSCRIPT GENERATION
-SECTION TO WRITE: {section_name}
-
-PREVIOUS SECTION CONTEXT:
+IMMEDIATE PREDECESSOR CONTEXT:
 {previous_section_text}
 
-SPECIFIC DATA FOR THIS SECTION:
-{section_specific_payload}
+SECTION DATA PAYLOAD:
+{section_payload}
 
-WRITING INSTRUCTIONS:
+INSTRUCTIONS:
 {section_instructions}
 
 Return only the section prose text. No JSON.
@@ -37,26 +35,44 @@ No bullet points unless section requires explicit subsection labels.
 
 
 SECTION_MAP = [
-    {'key': '1_0_introduction', 'name': '1.0 Introduction', 'prompt': 'phase_23_1_0_introduction.md', 'include_registry': False, 'payload': 'intro_payload', 'placeholder_tags': []},
-    {'key': '2_1_search_strategy', 'name': '2.1 Search Strategy', 'prompt': 'phase_23_2_1_search_strategy.md', 'include_registry': False, 'payload': 'search_payload', 'placeholder_tags': ['[INSERT TABLE 1: SCOPUS QUERY STRINGS]']},
-    {'key': '2_2_selection_criteria', 'name': '2.2 Selection Criteria', 'prompt': 'phase_23_2_2_selection_criteria.md', 'include_registry': False, 'payload': 'criteria_payload', 'placeholder_tags': ['[INSERT TABLE 2: PICO AND CRITERIA]']},
-    {'key': '2_3_study_selection_process', 'name': '2.3 Study Selection Process', 'prompt': 'phase_23_2_3_study_selection_process.md', 'include_registry': False, 'payload': 'study_selection_process_payload', 'placeholder_tags': []},
-    {'key': '2_4_data_extraction', 'name': '2.4 Data Extraction', 'prompt': 'phase_23_2_4_data_extraction.md', 'include_registry': False, 'payload': 'data_extraction_payload', 'placeholder_tags': []},
-    {'key': '3_1_study_selection', 'name': '3.1 Study Selection', 'prompt': 'phase_23_3_1_study_selection.md', 'include_registry': False, 'payload': 'study_selection_payload', 'placeholder_tags': ['[INSERT FIGURE 1: PRISMA FLOW DIAGRAM]']},
-    {'key': '3_2_study_characteristics', 'name': '3.2 Study Characteristics', 'prompt': 'phase_23_3_2_study_characteristics.md', 'include_registry': True, 'payload': 'study_characteristics_payload', 'placeholder_tags': ['[INSERT TABLE 3: STUDY CHARACTERISTICS]']},
-    {'key': '3_2b_tccm_analysis', 'name': '3.2b TCCM Analysis', 'prompt': 'phase_23_3_2b_tccm_analysis.md', 'include_registry': True, 'payload': 'tccm_payload', 'placeholder_tags': ['[INSERT TABLE 3B: TCCM ANALYSIS]']},
-    {'key': '3_3_quality_assessment_results', 'name': '3.3 Quality Assessment', 'prompt': 'phase_23_3_3_quality_results.md', 'include_registry': True, 'payload': 'quality_results_payload', 'placeholder_tags': ['[INSERT TABLE 4: QUALITY ASSESSMENT SUMMARY]', '[INSERT FIGURE 2: RISK OF BIAS CHART]']},
-    {'key': '3_4_bibliometric_findings', 'name': '3.4 Bibliometric Findings', 'prompt': 'phase_23_3_4_bibliometric_findings.md', 'include_registry': True, 'payload': 'bibliometric_payload', 'placeholder_tags': ['[INSERT FIGURE 3: BIBLIOMETRIC OVERVIEW]']},
-    {'key': '3_5_synthesis_of_themes', 'name': '3.5 Synthesis of Findings', 'prompt': 'phase_23_3_5_synthesis_of_themes.md', 'include_registry': True, 'payload': 'themes_payload', 'placeholder_tags': ['[INSERT FIGURE 4: THEME FREQUENCY]', '[INSERT FIGURE 5: EVIDENCE HEATMAP]']},
-    {'key': '3_6_subgroup_analysis', 'name': '3.6 Subgroup Analysis', 'prompt': 'phase_23_3_6_subgroup_analysis.md', 'include_registry': True, 'payload': 'subgroup_payload', 'placeholder_tags': ['[INSERT FIGURE 6: SUBGROUP ANALYSIS PANELS]']},
-    {'key': '3_7_theory_landscape', 'name': '3.7 Theory Landscape of the Corpus', 'prompt': 'phase_23_3_7_theory_landscape.md', 'include_registry': True, 'payload': 'theory_landscape_payload', 'placeholder_tags': []},
-    {'key': '3_8_theoretical_synthesis', 'name': '3.8 Cross-Theme Theoretical Synthesis and Propositions', 'prompt': 'phase_23_3_8_theoretical_synthesis.md', 'include_registry': True, 'payload': 'theoretical_synthesis_payload', 'placeholder_tags': []},
-    {'key': '4_0_discussion', 'name': '4.0 Discussion', 'prompt': 'phase_23_4_0_discussion.md', 'include_registry': True, 'payload': 'discussion_payload', 'placeholder_tags': ['[INSERT FIGURE 7: CONCEPTUAL MODEL]']},
-    {'key': '6_0_future_research', 'name': '6.0 Future Research Agenda', 'prompt': 'phase_23_6_0_future_research_tccm_on.md', 'include_registry': False, 'payload': 'future_research_payload', 'placeholder_tags': []},
-    {'key': '5_0_conclusion', 'name': '5.0 Conclusion', 'prompt': 'phase_23_5_0_conclusion.md', 'include_registry': False, 'payload': 'conclusion_payload', 'placeholder_tags': []},
-    {'key': 'abstract', 'name': 'Abstract', 'prompt': 'phase_23_abstract.md', 'include_registry': True, 'payload': 'abstract_payload', 'placeholder_tags': []},
-    {'key': 'references', 'name': 'References', 'prompt': 'phase_23_references.md', 'include_registry': True, 'payload': 'references_payload', 'placeholder_tags': [], 'non_llm': True},
+    {'key': '1_0_intro', 'name': '1.0 Introduction', 'prompt': 'prompts_final/Phase 23-1.0-Introduction.md', 'payload': 'p_1_0_intro', 'placeholder_tags': []},
+    {'key': '2_1_search', 'name': '2.1 Search Strategy and 2.2 Selection Criteria', 'prompt': 'prompts_final/Phase 23_2.1 Search Strategy & 2.2 Selection Criteria.md', 'payload': 'p_2_1_search_2_2_criteria', 'placeholder_tags': []},
+    {'key': '2_3_process', 'name': '2.3 Study Selection and Data Extraction', 'prompt': 'prompts_final/Phase 23_2.3 Study Selection and Data Extraction.md', 'payload': 'p_2_3_process_extraction', 'placeholder_tags': []},
+    {'key': '3_1_results', 'name': '3.1 Search Results and Quality Assessment', 'prompt': 'prompts_final/Phase 23_3.1 Results and Quality Assessment.md', 'payload': 'p_3_1_results_quality', 'placeholder_tags': []},
+    {'key': '3_2_char', 'name': '3.2 Study Characteristics and Subgroup Analysis', 'prompt': 'prompts_final/Phase 23_3.2 Study Characteristics and Subgroup Analysis.md', 'payload': 'p_3_2_characteristics_subgroup', 'placeholder_tags': []},
+    {'key': '3_3_biblio', 'name': '3.3 Bibliometric Findings', 'prompt': 'prompts_final/Phase 23_3.3 Bibliometric Findings.md', 'payload': 'p_3_3_bibliometric', 'placeholder_tags': []},
+    {'key': '3_4_synthesis', 'name': '3.4 Thematic Synthesis of Empirical Findings', 'prompt': 'prompts_final/phase_23_3_4_synthesis_of_themes.md', 'payload': 'p_3_4_synthesis', 'placeholder_tags': []},
+    {'key': '3_5_theory', 'name': '3.5 Integrated Theoretical Framework and Propositions', 'prompt': 'prompts_final/Phase 23_3.5 Theory and Propositions.md', 'payload': 'p_3_5_theory_propositions', 'placeholder_tags': []},
+    {'key': '4_1_rq_disc', 'name': '4.1 Addressing the Core Research Questions', 'prompt': 'prompts_final/Phase 23_4.1 Addressing the Research Questions.md', 'payload': 'p_4_1_rq_discussion', 'placeholder_tags': []},
+    {'key': '4_2_policy', 'name': '4.2 Practice and Policy Implications', 'prompt': 'prompts_final/Phase 23_4.2 Practice and Policy Implications.md', 'payload': 'p_4_2_implications', 'placeholder_tags': []},
+    {'key': '4_3_limits', 'name': '4.3 Limitations of the Review', 'prompt': 'prompts_final/Phase 23_4.3 Limitations.md', 'payload': 'p_4_3_limitations', 'placeholder_tags': []},
+    {'key': '4_4_future', 'name': '4.4 Future Research Agenda', 'prompt': 'prompts_final/Phase 23_4.4 Future Research Agenda.md', 'payload': 'p_4_4_future_research', 'placeholder_tags': []},
+    {'key': '5_0_concl', 'name': '5.0 Conclusion', 'prompt': 'prompts_final/Phase 23_5.0 Conclusion.md', 'payload': 'p_5_0_conclusion', 'placeholder_tags': []},
 ]
+
+MANUSCRIPT_STRUCTURE = [
+    {'id': '1.0', 'title': 'Introduction'},
+    {'id': '2.0', 'title': 'Methodology'},
+    {'id': '2.1', 'title': 'Search Strategy', 'key': '2_1_search'},
+    {'id': '2.2', 'title': 'Selection Criteria', 'key': '2_1_search'},
+    {'id': '2.3', 'title': 'Study Selection and Data Extraction', 'key': '2_3_process'},
+    {'id': '3.0', 'title': 'Results'},
+    {'id': '3.1', 'title': 'Search Results and Quality Assessment', 'key': '3_1_results'},
+    {'id': '3.2', 'title': 'Study Characteristics and Subgroup Analysis', 'key': '3_2_char'},
+    {'id': '3.3', 'title': 'Bibliometric Findings', 'key': '3_3_biblio'},
+    {'id': '3.4', 'title': 'Thematic Synthesis of Empirical Findings', 'key': '3_4_synthesis'},
+    {'id': '3.5', 'title': 'Integrated Theoretical Framework and Propositions', 'key': '3_5_theory'},
+    {'id': '4.0', 'title': 'Discussion'},
+    {'id': '4.1', 'title': 'Addressing the Core Research Questions', 'key': '4_1_rq_disc'},
+    {'id': '4.2', 'title': 'Practice and Policy Implications', 'key': '4_2_policy'},
+    {'id': '4.3', 'title': 'Limitations of the Review', 'key': '4_3_limits'},
+    {'id': '4.4', 'title': 'Future Research Agenda', 'key': '4_4_future'},
+    {'id': '5.0', 'title': 'Conclusion', 'key': '5_0_concl'},
+]
+
+THEORY_OPTION_KEYS = {'3_5_theory'}
+TCCM_OPTION_KEYS = {'3_2_char'}
+FUTURE_RESEARCH_KEY = '4_4_future'
 
 
 class GhostwriterService:
@@ -157,30 +173,14 @@ class GhostwriterService:
                 return [k]
         return []
 
-    def _write_section(self, stage, section_key):
+    def get_section_prompt(self, section_key):
+        stage = self._ensure_stage()
         config = next(x for x in SECTION_MAP if x['key'] == section_key)
         payload = self._build_payload(config['payload'], stage)
-        options = self._options(stage)
-
-        if config.get('non_llm'):
-            return self._inject_placeholders(self._render_references(payload), config)
-
         previous_text = self._previous_section_text(stage, section_key)
-        scaffold_preamble = get_scaffold_preamble(
-            self.review,
-            previous_sections_labelled='',
-            include_registry=bool(config.get('include_registry', True)),
-            include_theoretical_framework=options.get('include_theoretical_framework', True),
-            include_conceptual_model=options.get('include_conceptual_model', True),
-            include_tccm=options.get('include_tccm', True),
-        )
-        prompt_file = self._resolve_prompt_file(section_key=section_key, options=options, default_prompt=config['prompt'])
-
-        section_context = self._build_section_prompt_context(
-            stage=stage,
-            section_key=section_key,
-            payload=payload,
-        )
+        global_intro_text = self._global_intro_text(stage=stage)
+        prompt_file = config['prompt']
+        section_context = self._build_section_prompt_context(stage=stage, section_key=section_key, payload=payload)
         section_instructions = render_prompt_template(
             prompt_file,
             context=section_context,
@@ -189,24 +189,48 @@ class GhostwriterService:
         self._assert_no_unresolved_placeholders(section_instructions, section_key=section_key)
 
         prompt = render_prompt_template(
-            'phase_23_shell.md',
+            'prompts_final/phase_23_shell.md',
             context={
-                'scaffold_preamble': scaffold_preamble,
-                'section_name': config['name'],
+                'global_intro_text': global_intro_text,
                 'previous_section_text': previous_text,
-                'section_specific_payload': json.dumps(payload, ensure_ascii=False, indent=2),
+                'section_payload': json.dumps(payload, ensure_ascii=False, indent=2),
                 'section_instructions': section_instructions,
             },
             fallback=GHOSTWRITER_SHELL_FALLBACK,
         )
+        return prompt
+
+    def _write_section(self, stage, section_key, custom_prompt=None):
+        config = next(x for x in SECTION_MAP if x['key'] == section_key)
+        
+        if custom_prompt:
+            prompt = custom_prompt
+        else:
+            payload = self._build_payload(config['payload'], stage)
+            previous_text = self._previous_section_text(stage, section_key)
+            global_intro_text = self._global_intro_text(stage=stage)
+            prompt_file = config['prompt']
+            section_context = self._build_section_prompt_context(stage=stage, section_key=section_key, payload=payload)
+            section_instructions = render_prompt_template(
+                prompt_file,
+                context=section_context,
+                fallback=SECTION_INSTRUCTION_FALLBACK,
+            )
+            self._assert_no_unresolved_placeholders(section_instructions, section_key=section_key)
+
+            prompt = render_prompt_template(
+                'prompts_final/phase_23_shell.md',
+                context={
+                    'global_intro_text': global_intro_text,
+                    'previous_section_text': previous_text,
+                    'section_payload': json.dumps(payload, ensure_ascii=False, indent=2),
+                    'section_instructions': section_instructions,
+                },
+                fallback=GHOSTWRITER_SHELL_FALLBACK,
+            )
         return self._inject_placeholders(self._call_deepseek(prompt), config, stage=stage)
 
     def _build_section_prompt_context(self, stage, section_key, payload):
-        scaffold = get_scaffold_data(self.review)
-        theory = scaffold.get('theoretical_framework', {}) if isinstance(scaffold.get('theoretical_framework', {}), dict) else {}
-        subgroup = payload.get('subgroup_data', {}) if isinstance(payload.get('subgroup_data', {}), dict) else {}
-        research_questions = payload.get('research_questions', []) if isinstance(payload.get('research_questions', []), list) else []
-
         ctx = {}
         for key, value in payload.items():
             if isinstance(value, (dict, list)):
@@ -214,48 +238,12 @@ class GhostwriterService:
             else:
                 ctx[key] = value
 
-        primary_lens = str(payload.get('primary_lens') or theory.get('primary_lens') or theory.get('recommended') or '').strip()
-        absent_theories = theory.get('theoretical_gaps', []) if isinstance(theory.get('theoretical_gaps', []), list) else []
-        propositions = payload.get('propositions', []) if isinstance(payload.get('propositions', []), list) else []
-
-        ctx['SECTION_LABEL_BLOCK'] = self._section_label_block(stage=stage, section_key=section_key)
-        ctx['primary_theoretical_lens'] = primary_lens
-        ctx['absent_theories_formatted'] = self._format_list(absent_theories) or 'None identified'
-        ctx['lens_pct_of_corpus'] = self._lens_pct_of_corpus(primary_lens)
-        ctx['rq_numbered_list'] = self._rq_numbered_list(research_questions)
-        ctx['primary_topic'] = str(self.review.title or 'the review topic')
-        ctx['propositions_formatted'] = json.dumps(propositions, ensure_ascii=False, indent=2) if propositions else '[]'
-        ctx['third_order_synthesis_text'] = str(payload.get('third_order_synthesis') or '')
-        ctx['theme_grades_formatted'] = self._theme_grades_formatted(payload)
-        ctx['all_reconciled_texts_formatted'] = self._all_reconciled_texts_formatted(payload)
-
-        rq_answers = self._rq_answers_formatted(payload)
-        ctx['rq_answers_formatted'] = rq_answers
-        ctx['rq1_answer'] = self._rq_single_answer(payload, 1)
-        ctx['rq3_paragraph_if_applicable'] = self._rq3_placeholder_block(payload)
-
-        by_design = payload.get('by_design') or subgroup.get('by_design') or {}
-        by_country = payload.get('by_country') or subgroup.get('by_country') or {}
-        by_year = payload.get('by_year') or subgroup.get('by_year') or {}
-        ctx['by_design_formatted'] = json.dumps(by_design, ensure_ascii=False, indent=2)
-        ctx['by_country_formatted'] = json.dumps(by_country, ensure_ascii=False, indent=2)
-        ctx['by_year_groups_formatted'] = json.dumps(by_year, ensure_ascii=False, indent=2)
-        ctx['year_subgroup_eligible'] = str(subgroup.get('year_subgroup_eligible', 'unknown'))
-        ctx['country_subgroup_note'] = self._country_subgroup_note(by_country)
-
-        tccm_future = payload.get('tccm_future_research') if isinstance(payload.get('tccm_future_research'), list) else []
-        ctx['tccm_key_gaps_or_omit'] = json.dumps(tccm_future[:5], ensure_ascii=False, indent=2) if tccm_future else 'TCCM gaps not available or omitted.'
-
-        if propositions:
-            ctx['propositions_testing_subsection_or_omit'] = (
-                'Add a short subsection on testing P1, P2, and P3 with concrete designs and contexts.'
-            )
-        else:
-            ctx['propositions_testing_subsection_or_omit'] = 'No propositions-testing subsection required.'
-
-        # Template helper placeholder appearing as prose token in one prompt.
-        ctx['theme_name'] = 'Theme Name'
-
+        flat = self._flatten_payload(payload)
+        ctx.update(flat)
+        if isinstance(payload.get('rq_list'), list):
+            ctx['rq_list'] = '\n'.join(str(x) for x in payload.get('rq_list') if str(x).strip())
+        if isinstance(payload.get('theme_synthesis'), list):
+            ctx['theme_synthesis.length'] = str(len(payload.get('theme_synthesis')))
         return ctx
 
     def _build_payload(self, stage_payload_key, stage):
@@ -287,6 +275,8 @@ class GhostwriterService:
         common = {
             'rq_count': len(rqs),
             'research_questions': rqs,
+            'rq_list': rqs,
+            'research_context': self._research_context(scaffold),
             'confidence_threshold': confidence_threshold,
             'auto_include_floor': auto_include_floor,
             'auto_included_count': auto_included_count,
@@ -298,8 +288,149 @@ class GhostwriterService:
             'theme_count': len(themes),
             'features': options,
             'sensitivity_results': sensitivity_results,
+            'paper_registry': paper_registry,
             **rq_map,
         }
+
+        theoretical_synthesis = get_theoretical_synthesis(scaffold)
+        reconciled_master_themes = self._reconciled_master_themes(themes)
+        theory_landscape = scaffold.get('theory_landscape', {}) if isinstance(scaffold.get('theory_landscape', {}), dict) else {}
+        tccm_summary = scaffold.get('tccm_summary', {}) if isinstance(scaffold.get('tccm_summary', {}), dict) else {}
+        conceptual_model_spec = scaffold.get('conceptual_model_spec', {}) if isinstance(scaffold.get('conceptual_model_spec', {}), dict) else {}
+        theoretical_framework = scaffold.get('theoretical_framework', {}) if isinstance(scaffold.get('theoretical_framework', {}), dict) else {}
+
+        if stage_payload_key == 'p_1_0_intro':
+            return {
+                **common,
+                'objectives': self.review.objectives,
+                'pico': scaffold.get('pico', {}) if isinstance(scaffold.get('pico', {}), dict) else {},
+            }
+
+        if stage_payload_key == 'p_2_1_search_2_2_criteria':
+            queries = list(self.review.search_queries.order_by('id').values('focus', 'query_string', 'rationale'))
+            return {
+                **common,
+                'search_queries': queries,
+                'review_metadata': review_meta,
+                'pico': scaffold.get('pico', {}) if isinstance(scaffold.get('pico', {}), dict) else {},
+            }
+
+        if stage_payload_key == 'p_2_3_process_extraction':
+            return {
+                **common,
+                'prisma_counts': prisma,
+            }
+
+        if stage_payload_key == 'p_3_1_results_quality':
+            return {
+                **common,
+                'prisma_counts': prisma,
+                'quality_summary': quality_summary,
+            }
+
+        if stage_payload_key == 'p_3_2_characteristics_subgroup':
+            context_dim = tccm_summary.get('context_dimension', {}) if isinstance(tccm_summary.get('context_dimension', {}), dict) else {}
+            char_dim = tccm_summary.get('characteristics_dimension', {}) if isinstance(tccm_summary.get('characteristics_dimension', {}), dict) else {}
+            methods_dim = tccm_summary.get('methods_dimension', {}) if isinstance(tccm_summary.get('methods_dimension', {}), dict) else {}
+            return {
+                **common,
+                'prisma_counts': prisma,
+                'tccm_summary': tccm_summary,
+                'subgroup_data': {
+                    'characteristics_dimension': char_dim,
+                    'context_dimension': context_dim,
+                },
+                'tccm_summary.characteristics_dimension': char_dim,
+                'tccm_summary.context_dimension': context_dim,
+                'tccm_summary.methods_dimension': methods_dim,
+            }
+
+        if stage_payload_key == 'p_3_3_bibliometric':
+            return {
+                **common,
+                'review_metadata': review_meta,
+                'quality_summary': quality_summary,
+                'review_metadata.journals': review_meta.get('journals', []),
+            }
+
+        if stage_payload_key == 'p_3_4_synthesis':
+            theme_synthesis = [
+                {
+                    'theme_name': t.theme_name_locked,
+                    'evidence_grade': t.evidence_grade,
+                    'paper_count': t.paper_count,
+                    'theme_description': t.theme_description,
+                }
+                for t in themes
+            ]
+            return {
+                **common,
+                'prisma_counts': prisma,
+                'theme_synthesis': theme_synthesis,
+                'all_reconciled_texts_with_theme_names': [
+                    {
+                        'theme_name': t.theme_name_locked,
+                        'evidence_grade': t.evidence_grade,
+                        'paper_count': t.paper_count,
+                        'reconciled_text': (t.reconciled_text or t.reconciler_notes),
+                    }
+                    for t in themes
+                ],
+            }
+
+        if stage_payload_key == 'p_3_5_theory_propositions':
+            return {
+                **common,
+                'theory_landscape': theory_landscape,
+                'theoretical_framework': theoretical_framework,
+                'theoretical_synthesis': theoretical_synthesis,
+                'conceptual_model_spec': conceptual_model_spec,
+                'reconciled_master_themes': reconciled_master_themes,
+            }
+
+        if stage_payload_key == 'p_4_1_rq_discussion':
+            return {
+                **common,
+                'theoretical_synthesis': theoretical_synthesis,
+                'reconciled_master_themes': reconciled_master_themes,
+            }
+
+        if stage_payload_key == 'p_4_2_implications':
+            return {
+                **common,
+                'theoretical_synthesis': theoretical_synthesis,
+                'reconciled_master_themes': reconciled_master_themes,
+                'theme_synthesis': reconciled_master_themes,
+            }
+
+        if stage_payload_key == 'p_4_3_limitations':
+            return {
+                **common,
+                'quality_summary': quality_summary,
+                'review_metadata': review_meta,
+                'prisma_counts': prisma,
+            }
+
+        if stage_payload_key == 'p_4_4_future_research':
+            context_dim = tccm_summary.get('context_dimension', {}) if isinstance(tccm_summary.get('context_dimension', {}), dict) else {}
+            char_dim = tccm_summary.get('characteristics_dimension', {}) if isinstance(tccm_summary.get('characteristics_dimension', {}), dict) else {}
+            methods_dim = tccm_summary.get('methods_dimension', {}) if isinstance(tccm_summary.get('methods_dimension', {}), dict) else {}
+            return {
+                **common,
+                'prisma_counts': prisma,
+                'tccm_summary': tccm_summary,
+                'theoretical_gaps': theory_landscape.get('theoretical_gaps', []) if isinstance(theory_landscape.get('theoretical_gaps', []), list) else [],
+                'tccm_summary.characteristics_dimension': char_dim,
+                'tccm_summary.context_dimension': context_dim,
+                'tccm_summary.methods_dimension': methods_dim,
+            }
+
+        if stage_payload_key == 'p_5_0_conclusion':
+            return {
+                **common,
+                'prisma_counts': prisma,
+                'theoretical_synthesis': theoretical_synthesis,
+            }
 
         if stage_payload_key == 'intro_payload':
             return {**common, 'objectives': self.review.objectives}
@@ -524,6 +655,47 @@ class GhostwriterService:
             parts.append(f'- {name}: {status}')
         return '\n'.join(parts) if parts else 'No prior section labels.'
 
+    def _flatten_payload(self, payload, parent=''):
+        out = {}
+        if isinstance(payload, dict):
+            for key, value in payload.items():
+                full = f'{parent}.{key}' if parent else str(key)
+                if isinstance(value, dict):
+                    out.update(self._flatten_payload(value, full))
+                else:
+                    if isinstance(value, list):
+                        out[full] = json.dumps(value, ensure_ascii=False, indent=2)
+                    else:
+                        out[full] = str(value)
+        return out
+
+    def _global_intro_text(self, stage):
+        sec = stage.get('sections', {}).get('1_0_intro', {}) if isinstance(stage.get('sections', {}), dict) else {}
+        return (sec.get('text') or '').strip() or 'No introduction written yet.'
+
+    def _research_context(self, scaffold):
+        review_meta = scaffold.get('review_metadata', {}) if isinstance(scaffold.get('review_metadata', {}), dict) else {}
+        context = str(review_meta.get('research_context') or '').strip()
+        if context:
+            return context
+        return str(self.review.title or '').strip()
+
+    def _reconciled_master_themes(self, themes):
+        rows = []
+        for t in themes:
+            master_description = str(t.reconciled_text or '').strip()
+            theoretical_integration = str(t.reconciler_notes or '').strip() or master_description
+            rows.append(
+                {
+                    'theme_name': t.theme_name_locked,
+                    'evidence_grade': t.evidence_grade,
+                    'paper_count': int(t.paper_count or 0),
+                    'master_description': master_description,
+                    'theoretical_integration': theoretical_integration,
+                }
+            )
+        return rows
+
     def _format_list(self, items):
         if not isinstance(items, list) or not items:
             return ''
@@ -728,17 +900,24 @@ class GhostwriterService:
         active_keys = set(self._active_order(stage=stage))
         out = []
         toc_lines = ['## Table of Contents', '']
-        for item in SECTION_MAP:
-            if item['key'] in active_keys:
-                toc_lines.append(f'- {item["name"]}')
-        out.append('\n'.join(toc_lines))
-        for item in SECTION_MAP:
-            if item['key'] not in active_keys:
+        for item in MANUSCRIPT_STRUCTURE:
+            key = item.get('key')
+            if key and key not in active_keys:
                 continue
-            sec = stage['sections'].get(item['key'], {})
-            text = (sec.get('text') or '').strip()
+            toc_lines.append(f'- {item["id"]} {item["title"]}')
+        out.append('\n'.join(toc_lines))
+        for item in MANUSCRIPT_STRUCTURE:
+            key = item.get('key')
+            heading = f'## {item["id"]} {item["title"]}'
+            if not key:
+                out.append(heading)
+                continue
+            if key not in active_keys:
+                continue
+            sec = stage['sections'].get(key, {})
+            text = self._normalize_section_text(section_text=(sec.get('text') or ''), heading_text=f'{item["id"]} {item["title"]}')
             if text:
-                out.append(f'## {item["name"]}\n\n{text}')
+                out.append(f'{heading}\n\n{text}')
         return '\n\n'.join(out)
 
     def _ensure_stage(self):
@@ -874,19 +1053,17 @@ class GhostwriterService:
         options = self._options(stage)
         order = [s['key'] for s in SECTION_MAP]
         if not options.get('include_theoretical_framework', True):
-            order = [k for k in order if k not in {'3_7_theory_landscape', '3_8_theoretical_synthesis'}]
+            order = [k for k in order if k not in THEORY_OPTION_KEYS]
         if not options.get('include_tccm', True):
-            order = [k for k in order if k != '3_2b_tccm_analysis']
+            order = [k for k in order if k not in TCCM_OPTION_KEYS]
         if not options.get('include_future_research', True):
-            order = [k for k in order if k != '6_0_future_research']
+            order = [k for k in order if k != FUTURE_RESEARCH_KEY]
         return order
 
     def _apply_options_to_sections(self, stage):
         options = self._options(stage)
         sections = stage.get('sections', {}) if isinstance(stage.get('sections', {}), dict) else {}
-        theory_keys = {'3_7_theory_landscape', '3_8_theoretical_synthesis'}
-        tccm_key = '3_2b_tccm_analysis'
-        for key in theory_keys:
+        for key in THEORY_OPTION_KEYS:
             if key in sections:
                 sec = sections[key]
                 if not options.get('include_theoretical_framework', True):
@@ -895,7 +1072,9 @@ class GhostwriterService:
                 else:
                     if sec.get('status') == 'skipped':
                         sec['status'] = 'pending'
-        if tccm_key in sections:
+        for tccm_key in TCCM_OPTION_KEYS:
+            if tccm_key not in sections:
+                continue
             sec = sections[tccm_key]
             if not options.get('include_tccm', True):
                 if sec.get('status') in {'pending', 'skipped'}:
@@ -904,7 +1083,7 @@ class GhostwriterService:
                 if sec.get('status') == 'skipped':
                     sec['status'] = 'pending'
 
-        future_key = '6_0_future_research'
+        future_key = FUTURE_RESEARCH_KEY
         if future_key in sections:
             sec = sections[future_key]
             if not options.get('include_future_research', True):
@@ -921,11 +1100,39 @@ class GhostwriterService:
         options = self._options(stage or {})
         if config.get('key') == '4_0_discussion' and not options.get('include_conceptual_model', True):
             tags = [tag for tag in tags if 'CONCEPTUAL MODEL' not in tag.upper()]
-        if config.get('key') == '3_2b_tccm_analysis' and not options.get('include_tccm', True):
+        if config.get('key') in TCCM_OPTION_KEYS and not options.get('include_tccm', True):
             return []
         if config.get('key') == '3_6_subgroup_analysis' and not options.get('include_sensitivity', True):
             tags = [tag for tag in tags if 'SENSITIVITY' not in tag.upper()]
         return tags
+
+    def _normalize_section_text(self, section_text, heading_text):
+        text = (section_text or '').strip()
+        if not text:
+            return ''
+        lines = text.splitlines()
+        normalized_heading = heading_text.strip().casefold()
+        while lines:
+            first = lines[0].strip()
+            if not first:
+                lines.pop(0)
+                continue
+            plain_first = re.sub(r'^\s*#{1,6}\s*', '', first).strip()
+            plain_first = re.sub(r'^\s*\d+(\.\d+)*\s*[:.\-]?\s*', '', plain_first).strip()
+            plain_heading = re.sub(r'^\s*\d+(\.\d+)*\s*', '', heading_text).strip().casefold()
+            first_cmp = plain_first.casefold()
+            if (
+                first_cmp == normalized_heading
+                or first_cmp == plain_heading
+                or normalized_heading in first_cmp
+                or plain_heading in first_cmp
+            ):
+                lines.pop(0)
+                while lines and not lines[0].strip():
+                    lines.pop(0)
+                continue
+            break
+        return '\n'.join(lines).strip()
 
     def _preflight_validate(self, stage, options):
         scaffold = get_scaffold_data(self.review)

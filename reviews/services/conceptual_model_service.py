@@ -50,6 +50,7 @@ def generate_conceptual_model_spec(review_id):
     prompt = render_prompt_template(
         'phase_19_conceptual_model_spec.md',
         context={
+            'research_context': _research_context(review, scaffold),
             'primary_topic': review.title or '',
             'primary_theoretical_lens': primary_lens,
             'propositions_formatted': json.dumps(propositions, ensure_ascii=False, indent=2),
@@ -203,6 +204,14 @@ def _validate_spec(spec):
         raise RuntimeError('Conceptual model spec missing valid main_outcome.id.')
     if not isinstance(spec.get('relationships'), list) or not spec.get('relationships'):
         raise RuntimeError('Conceptual model spec must contain at least one relationship.')
+
+
+def _research_context(review, scaffold):
+    review_meta = scaffold.get('review_metadata', {}) if isinstance(scaffold.get('review_metadata', {}), dict) else {}
+    text = str(review_meta.get('research_context') or '').strip()
+    if text:
+        return text
+    return str(review.title or '').strip()
 
 
 def _parse_with_correction(raw_response):

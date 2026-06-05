@@ -21,6 +21,7 @@ def run_theory_landscape_for_review(review_id):
     prompt = render_prompt_template(
         'phase_17a_theory_landscape.md',
         context={
+            'research_context': _research_context(review),
             'objectives': review.objectives or '',
             'rq_list': rq_list,
             'total_papers': len(corpus),
@@ -106,6 +107,7 @@ def run_cross_theme_theoretical_synthesis_for_review(review_id):
     prompt = render_prompt_template(
         'phase_17b_cross_theme_theoretical_synthesis.md',
         context={
+            'research_context': _research_context(review),
             'primary_theoretical_lens': primary_lens,
             'supporting_lenses': ', '.join(str(x) for x in supporting_lenses) if supporting_lenses else 'None',
             'objectives': review.objectives or '',
@@ -146,16 +148,22 @@ def _build_theory_corpus(review):
     rows = []
     for paper in papers:
         extraction = paper.full_text_extraction if isinstance(paper.full_text_extraction, dict) else {}
-        frameworks = extraction.get('theoretical_frameworks')
+        tccm = paper.full_text_tccm if isinstance(getattr(paper, 'full_text_tccm', {}), dict) else {}
+        frameworks = tccm.get('theories') if isinstance(tccm.get('theories'), list) else extraction.get('theoretical_frameworks')
         normalized_frameworks = _normalize_frameworks(frameworks, extraction)
         if not normalized_frameworks:
             continue
+
+        apa_parenthetical = _safe_text(extraction.get('apa_citation_parenthetical'))
+        if not apa_parenthetical:
+            apa_parenthetical = _short_ref(paper, extraction)
 
         rows.append(
             {
                 'paper_id': paper.id,
                 'scopus_id': paper.scopus_id or '',
                 'short_ref': _short_ref(paper, extraction),
+                'apa_citation_parenthetical': apa_parenthetical,
                 'year': paper.publication_year,
                 'study_design': extraction.get('study_design_canonical') or extraction.get('study_design') or '',
                 'theoretical_frameworks': normalized_frameworks,
@@ -180,7 +188,8 @@ def _normalize_frameworks(frameworks, extraction):
                 {
                     'theory_name': theory_name,
                     'usage_type': usage_type,
-                    'how_used': str(item.get('how_used') or '').strip(),
+                    'is_explicitly_stated': bool(item.get('is_explicitly_stated')) if item.get('is_explicitly_stated') is not None else (usage_type != 'implicit'),
+                    'usage_description': str(item.get('usage_description') or item.get('how_used') or '').strip(),
                 }
             )
 
@@ -189,7 +198,14 @@ def _normalize_frameworks(frameworks, extraction):
 
     legacy = str(extraction.get('theory_framework') or '').strip()
     if legacy:
-        return [{'theory_name': legacy, 'usage_type': 'secondary', 'how_used': ''}]
+        return [
+            {
+                'theory_name': legacy,
+                'usage_type': 'secondary',
+                'is_explicitly_stated': False,
+                'usage_description': '',
+            }
+        ]
     return []
 
 
@@ -372,6 +388,19 @@ def _safe_int(value):
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _safe_text(value):
+    return str(value or '').strip()
+
+
+def _research_context(review):
+    scaffold = get_scaffold_data(review)
+    review_meta = scaffold.get('review_metadata', {}) if isinstance(scaffold.get('review_metadata', {}), dict) else {}
+    text = str(review_meta.get('research_context') or '').strip()
+    if text:
+        return text
+    return str(review.title or '').strip()
 
 
 def _parse_with_correction(raw_response, correction_template):

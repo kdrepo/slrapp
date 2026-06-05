@@ -57,6 +57,7 @@ from .views_tccm import (
 from .views_ghostwriter import (
     GhostwriterMonitorView,
     GhostwriterStatusView,
+    GhostwriterPromptPreviewView,
 )
 from .views_title_screening import (
     TitleMissingAbstractsStatusView,
@@ -122,6 +123,7 @@ urlpatterns = [
     path('reviews/<int:pk>/tccm/status/', TCCMStatusView.as_view(), name='tccm-status'),
     path('reviews/<int:pk>/ghostwriter/monitor/', GhostwriterMonitorView.as_view(), name='ghostwriter-monitor'),
     path('reviews/<int:pk>/ghostwriter/status/', GhostwriterStatusView.as_view(), name='ghostwriter-status'),
+    path('reviews/<int:pk>/ghostwriter/prompt-preview/', GhostwriterPromptPreviewView.as_view(), name='ghostwriter-prompt-preview'),
     path('reviews/<int:pk>/visual-assets/monitor/', VisualAssetsMonitorView.as_view(), name='visual-assets-monitor'),
     path('reviews/<int:pk>/visual-assets/status/', VisualAssetsStatusView.as_view(), name='visual-assets-status'),
     path('reviews/<int:pk>/visual-assets/gallery/', VisualAssetsGalleryView.as_view(), name='visual-assets-gallery'),

@@ -22,31 +22,6 @@
   <div class="card">
     <h1>Phase 23: Ghostwriter</h1>
     <p>Review: <strong>{{ review.title }}</strong></p>
-    <form method="post" style="margin-bottom: 0.8rem;">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update_options">
-      <label style="margin-right:1rem;">
-        <input type="checkbox" name="include_theoretical_framework" {% if options.include_theoretical_framework %}checked{% endif %}>
-        Include Theoretical Framework Anchoring (3.7, 3.8)
-      </label>
-      <label style="margin-right:1rem;">
-        <input type="checkbox" name="include_conceptual_model" {% if options.include_conceptual_model %}checked{% endif %}>
-        Include Conceptual Model Integration (Discussion)
-      </label>
-      <label style="margin-right:1rem;">
-        <input type="checkbox" name="include_tccm" {% if options.include_tccm %}checked{% endif %}>
-        Include TCCM Analysis (3.2b)
-      </label>
-      <label style="margin-right:1rem;">
-        <input type="checkbox" name="include_future_research" {% if options.include_future_research %}checked{% endif %}>
-        Include Future Research Agenda (Section 6)
-      </label>
-      <label style="margin-right:1rem;">
-        <input type="checkbox" name="include_sensitivity" {% if options.include_sensitivity %}checked{% endif %}>
-        Include Sensitivity Analysis (Section 3.6.4)
-      </label>
-      <button type="submit">Save Writing Options</button>
-    </form>
     <form method="post">
       {% csrf_token %}
       <button type="submit" name="action" value="write_next">Write Next Step</button>
@@ -66,7 +41,7 @@
   </div>
 
   <div class="card">
-    <h2>Active TOC (Based on Options)</h2>
+    <h2>Active TOC</h2>
     <ol id="toc-list">
       {% for line in active_toc %}
         <li>{{ line }}</li>
@@ -79,30 +54,28 @@
   <div class="card">
     <h2>Section-by-Section Writing</h2>
     <table>
-      <thead><tr><th>Section</th><th>Included</th><th>Status</th><th>Words</th><th>Updated</th><th>Error</th><th>Action</th><th>Preview</th></tr></thead>
+      <thead><tr><th>Section</th><th>Status</th><th>Words</th><th>Updated</th><th>Error</th><th>Action</th><th>Preview</th></tr></thead>
       <tbody id="sections-body">
       {% for s in sections %}
         <tr>
           <td>{{ s.name }}</td>
-          <td>{% if s.included %}Yes{% else %}No{% endif %}</td>
           <td>{{ s.status }}</td>
           <td>{{ s.word_count }}</td>
           <td>{{ s.updated_at|default:'-' }}</td>
           <td>{{ s.error|default:'-' }}</td>
           <td>
-            {% if s.included %}
             <form method="post" style="display:inline;">
               {% csrf_token %}
               <input type="hidden" name="action" value="write_section">
               <input type="hidden" name="section_key" value="{{ s.key }}">
               <button type="submit">Write/Retry</button>
             </form>
-            {% else %}-{% endif %}
+            <button type="button" style="background:#0284c7; margin-left:0.4rem;" onclick="window.openPromptPreview('{{ s.key }}')">Preview Prompt</button>
           </td>
           <td>{{ s.text_preview }}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="8">No section state yet.</td></tr>
+        <tr><td colspan="7">No section state yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -134,10 +107,29 @@
 
 </div>
 
+<!-- Modal for Prompt Preview -->
+<div id="promptModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; padding:2rem;">
+  <div style="background:#fff; border-radius:8px; padding:1.5rem; max-width:1000px; margin:0 auto; height:90vh; display:flex; flex-direction:column;">
+    <h2>Preview & Edit Prompt</h2>
+    <p>Modify the prompt below if needed, then click "Write with Custom Prompt". This custom text is only used for this specific run.</p>
+    <form method="post" action="{% url 'reviews:ghostwriter-monitor' review.pk %}" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="write_section">
+      <input type="hidden" name="section_key" id="modalSectionKey" value="">
+      <textarea name="custom_prompt" id="modalPromptText" style="flex:1; width:100%; font-family:monospace; margin-bottom:1rem; padding:0.5rem;" required></textarea>
+      <div>
+        <button type="button" onclick="document.getElementById('promptModal').style.display='none'" style="background:#64748b;">Cancel</button>
+        <button type="submit">Write with Custom Prompt</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 (function(){
   const statusUrl = "{% url 'reviews:ghostwriter-status' review.pk %}";
   const monitorUrl = "{% url 'reviews:ghostwriter-monitor' review.pk %}";
+  const promptPreviewUrl = "{% url 'reviews:ghostwriter-prompt-preview' review.pk %}";
   const csrfToken = "{{ csrf_token }}";
   const statusEl = document.getElementById('status');
   const errorEl = document.getElementById('error');
@@ -146,21 +138,45 @@
   const compiledEl = document.getElementById('compiled');
   const tocList = document.getElementById('toc-list');
 
+  window.openPromptPreview = function(sectionKey) {
+    const modal = document.getElementById('promptModal');
+    const textarea = document.getElementById('modalPromptText');
+    const keyInput = document.getElementById('modalSectionKey');
+    
+    textarea.value = 'Loading prompt...';
+    keyInput.value = sectionKey;
+    modal.style.display = 'block';
+    
+    fetch(promptPreviewUrl + '?section_key=' + sectionKey)
+      .then(r => r.json())
+      .then(data => {
+        if (data.prompt) {
+          textarea.value = data.prompt;
+        } else {
+          textarea.value = 'Error: ' + (data.error || 'Unknown error');
+        }
+      })
+      .catch(e => {
+        textarea.value = 'Error fetching prompt: ' + e.message;
+      });
+  };
+
   function renderLogs(logs){
     if(!logs || !logs.length){ logsBody.innerHTML='<tr><td colspan="4">No logs yet.</td></tr>'; return; }
     logsBody.innerHTML = logs.map(l => '<tr><td>'+(l.time||'')+'</td><td>'+(l.event||'')+'</td><td>'+(l.message||'-')+'</td><td>'+((l.error_code? (l.error_code+': '+(l.error_message||'')) : '-'))+'</td></tr>').join('');
   }
 
   function renderSections(rows){
-    if(!rows || !rows.length){ sectionsBody.innerHTML='<tr><td colspan="8">No section state yet.</td></tr>'; return; }
+    if(!rows || !rows.length){ sectionsBody.innerHTML='<tr><td colspan="7">No section state yet.</td></tr>'; return; }
     sectionsBody.innerHTML = rows.map(s => {
-      const action = !s.included ? '-' : ('<form method="post" action="'+monitorUrl+'" style="display:inline;">'
+      const action = ('<form method="post" action="'+monitorUrl+'" style="display:inline;">'
         + '<input type="hidden" name="csrfmiddlewaretoken" value="'+csrfToken+'">'
         + '<input type="hidden" name="action" value="write_section">'
         + '<input type="hidden" name="section_key" value="'+(s.key||'')+'">'
         + '<button type="submit">Write/Retry</button>'
-        + '</form>');
-      return '<tr><td>'+ (s.name||'') +'</td><td>'+ (s.included ? 'Yes' : 'No') +'</td><td>'+ (s.status||'pending') +'</td><td>'+ (s.word_count||0) +'</td><td>'+ (s.updated_at||'-') +'</td><td>'+ (s.error||'-') +'</td><td>'+action+'</td><td>'+ (s.text_preview||'') +'</td></tr>';
+        + '</form>'
+        + '<button type="button" style="background:#0284c7; margin-left:0.4rem;" onclick="window.openPromptPreview(\''+(s.key||'')+'\')">Preview Prompt</button>');
+      return '<tr><td>'+ (s.name||'') +'</td><td>'+ (s.status||'pending') +'</td><td>'+ (s.word_count||0) +'</td><td>'+ (s.updated_at||'-') +'</td><td>'+ (s.error||'-') +'</td><td>'+action+'</td><td>'+ (s.text_preview||'') +'</td></tr>';
     }).join('');
   }
 

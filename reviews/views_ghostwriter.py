@@ -10,6 +10,10 @@ from django.views import View
 from .models import Review
 from .services.ghostwriter_service import SECTION_MAP, run_ghostwriter
 
+THEORY_OPTION_KEYS = {'3_5_theory'}
+TCCM_OPTION_KEYS = {'3_2_char'}
+FUTURE_RESEARCH_KEY = '4_4_future'
+
 
 class GhostwriterMonitorView(View):
     template_name = 'reviews/ghostwriter_monitor.html'
@@ -71,10 +75,12 @@ class GhostwriterMonitorView(View):
 
         mode = 'next'
         retry = False
+        custom_prompt = None
         if action == 'write_all':
             mode = 'all'
         elif action == 'write_section':
             mode = 'section'
+            custom_prompt = request.POST.get('custom_prompt') or None
         elif action == 'retry_failed':
             mode = 'failed'
             retry = True
@@ -88,7 +94,7 @@ class GhostwriterMonitorView(View):
 
         worker = threading.Thread(
             target=_run_async,
-            args=(review.pk, mode, section_key, retry),
+            args=(review.pk, mode, section_key, retry, custom_prompt),
             daemon=True,
         )
         worker.start()
@@ -96,6 +102,19 @@ class GhostwriterMonitorView(View):
         messages.success(request, 'Ghostwriter run started.')
         return redirect('reviews:ghostwriter-monitor', pk=review.pk)
 
+class GhostwriterPromptPreviewView(View):
+    def get(self, request, pk):
+        review = get_object_or_404(Review, pk=pk)
+        section_key = request.GET.get('section_key')
+        if not section_key:
+            return JsonResponse({'error': 'section_key is required'}, status=400)
+        
+        try:
+            service = __import__('reviews.services.ghostwriter_service', fromlist=['GhostwriterService']).GhostwriterService(review_id=review.pk)
+            prompt = service.get_section_prompt(section_key=section_key)
+            return JsonResponse({'prompt': prompt})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
 class GhostwriterStatusView(View):
     def get(self, request, pk):
@@ -107,9 +126,57 @@ class GhostwriterStatusView(View):
         return JsonResponse(stage)
 
 
-def _run_async(review_id, mode, section_key, retry):
+def _run_async(review_id, mode, section_key, retry, custom_prompt=None):
     try:
-        result = run_ghostwriter(review_id=review_id, mode=mode, section_key=section_key, retry=retry)
+        service = __import__('reviews.services.ghostwriter_service', fromlist=['GhostwriterService']).GhostwriterService(review_id=review_id)
+        if custom_prompt and mode == 'section' and section_key:
+            # We override the run method slightly if a custom prompt is provided for a specific section
+            stage = service._ensure_stage()
+            stage['status'] = 'running'
+            stage['started_at'] = timezone.now().isoformat()
+            stage['error_code'] = ''
+            stage['error_message'] = ''
+            stage['stop_requested'] = False
+            stage['current_section_key'] = section_key
+            sec = stage['sections'][section_key]
+            sec['status'] = 'running'
+            sec['error'] = ''
+            service._save_stage(stage)
+
+            try:
+                text = service._write_section(stage=stage, section_key=section_key, custom_prompt=custom_prompt)
+                stage = service._ensure_stage()
+                sec = stage['sections'][section_key]
+                sec['text'] = text
+                sec['status'] = 'done'
+                sec['updated_at'] = timezone.now().isoformat()
+                sec['word_count'] = service._word_count(text)
+                service._log(stage, 'section_done', f'{section_key} written with custom prompt ({sec["word_count"]} words).')
+                service._save_stage(stage)
+                written = 1
+            except Exception as exc:
+                stage = service._ensure_stage()
+                sec = stage['sections'][section_key]
+                sec['status'] = 'failed'
+                sec['error'] = f'{exc.__class__.__name__}: {exc}'
+                sec['updated_at'] = timezone.now().isoformat()
+                service._log(stage, 'section_failed', f'{section_key} failed: {exc.__class__.__name__}: {exc}')
+                stage['status'] = 'error'
+                stage['error_code'] = exc.__class__.__name__
+                stage['error_message'] = str(exc)
+                stage['completed_at'] = timezone.now().isoformat()
+                service._save_stage(stage)
+                written = 0
+
+            stage = service._ensure_stage()
+            stage['current_section_key'] = ''
+            stage['status'] = 'completed' if service._all_done(stage) else 'idle'
+            stage['completed_at'] = timezone.now().isoformat()
+            stage['compiled_draft'] = service._compile_draft(stage)
+            service._save_stage(stage)
+            result = {'written': written, 'stopped': False}
+        else:
+            result = service.run(mode=mode, section_key=section_key, retry=retry)
         review = Review.objects.get(pk=review_id)
         stage = _get_stage(review)
         logs = list(stage.get('logs') or [])
@@ -230,11 +297,11 @@ def _active_section_keys(stage):
     options = _get_options(stage)
     keys = [x['key'] for x in SECTION_MAP]
     if not options.get('include_theoretical_framework', True):
-        keys = [k for k in keys if k not in {'3_7_theory_landscape', '3_8_theoretical_synthesis'}]
+        keys = [k for k in keys if k not in THEORY_OPTION_KEYS]
     if not options.get('include_tccm', True):
-        keys = [k for k in keys if k != '3_2b_tccm_analysis']
+        keys = [k for k in keys if k not in TCCM_OPTION_KEYS]
     if not options.get('include_future_research', True):
-        keys = [k for k in keys if k != '6_0_future_research']
+        keys = [k for k in keys if k != FUTURE_RESEARCH_KEY]
     return keys
 
 
@@ -244,7 +311,7 @@ def _apply_options_to_sections(stage):
     if options.get('include_conceptual_model', True) and not options.get('include_theoretical_framework', True):
         options['include_theoretical_framework'] = True
         stage['options'] = options
-    for key in {'3_7_theory_landscape', '3_8_theoretical_synthesis'}:
+    for key in THEORY_OPTION_KEYS:
         if key in sections:
             sec = sections[key]
             if not options.get('include_theoretical_framework', True):
@@ -253,8 +320,9 @@ def _apply_options_to_sections(stage):
             else:
                 if sec.get('status') == 'skipped':
                     sec['status'] = 'pending'
-    tccm_key = '3_2b_tccm_analysis'
-    if tccm_key in sections:
+    for tccm_key in TCCM_OPTION_KEYS:
+        if tccm_key not in sections:
+            continue
         sec = sections[tccm_key]
         if not options.get('include_tccm', True):
             if sec.get('status') in {'pending', 'skipped'}:
@@ -262,7 +330,7 @@ def _apply_options_to_sections(stage):
         else:
             if sec.get('status') == 'skipped':
                 sec['status'] = 'pending'
-    future_key = '6_0_future_research'
+    future_key = FUTURE_RESEARCH_KEY
     if future_key in sections:
         sec = sections[future_key]
         if not options.get('include_future_research', True):

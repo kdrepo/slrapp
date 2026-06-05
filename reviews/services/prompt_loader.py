@@ -8,13 +8,25 @@ def prompt_file_path(filename):
     return os.path.join(getattr(settings, 'BASE_DIR', ''), 'reviews', 'prompts', filename)
 
 
+def _candidate_prompt_names(filename):
+    name = (filename or '').replace('\\', '/').strip().lstrip('/')
+    if not name:
+        return []
+    if name.startswith('prompts_final/'):
+        return [name]
+    return [f'prompts_final/{name}', name]
+
+
 @lru_cache(maxsize=128)
 def load_prompt_template(filename):
-    path = prompt_file_path(filename)
-    if not os.path.exists(path):
-        raise FileNotFoundError(f'Prompt file not found: {path}')
-    with open(path, 'r', encoding='utf-8') as handle:
-        return handle.read().strip()
+    candidates = _candidate_prompt_names(filename)
+    for name in candidates:
+        path = prompt_file_path(name)
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as handle:
+                return handle.read().strip()
+    searched = ', '.join(prompt_file_path(name) for name in candidates) or str(filename)
+    raise FileNotFoundError(f'Prompt file not found. Searched: {searched}')
 
 
 def render_prompt_template(filename, context=None, fallback=''):

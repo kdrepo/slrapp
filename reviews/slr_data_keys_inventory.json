@@ -1,0 +1,614 @@
+{
+  "slr_models": {
+    "Review": [
+      "id",
+      "title",
+      "objectives",
+      "pico_population",
+      "pico_intervention",
+      "pico_comparison",
+      "pico_outcomes",
+      "inclusion_criteria",
+      "exclusion_criteria",
+      "status",
+      "stage_progress",
+      "scaffold_data",
+      "scaffold_preamble_template",
+      "theme_synthesis",
+      "theme_synthesis_status",
+      "theme_synthesis_error",
+      "theme_synthesis_updated_at"
+    ],
+    "ResearchQuestion": [
+      "id",
+      "review",
+      "question_text",
+      "type"
+    ],
+    "SearchQuery": [
+      "id",
+      "review",
+      "query_string",
+      "focus",
+      "rationale",
+      "is_executed",
+      "ris_uploaded",
+      "ris_uploaded_at",
+      "ris_file_name",
+      "imported_records",
+      "missing_abstracts"
+    ],
+    "Paper": [
+      "id",
+      "review",
+      "title",
+      "authors",
+      "abstract",
+      "publication_year",
+      "journal",
+      "volume",
+      "number",
+      "start_page",
+      "end_page",
+      "publisher",
+      "issn",
+      "language",
+      "type_of_work",
+      "access_date",
+      "notes",
+      "doi",
+      "scopus_id",
+      "url",
+      "keywords",
+      "citation_count",
+      "ta_decision",
+      "title_screening_decision",
+      "title_screening_confidence",
+      "title_screening_reason",
+      "title_screening_status",
+      "title_screening_provider",
+      "title_screening_model",
+      "title_screening_error",
+      "title_screening_screened_at",
+      "ta_confidence",
+      "ta_reason",
+      "screening_conflict",
+      "pdf_source",
+      "pdf_path",
+      "fulltext_retrieved",
+      "mineru_markdown",
+      "mineru_parsed",
+      "processed_pdf_mineru",
+      "mineru_batch_id",
+      "mineru_status",
+      "mineru_error",
+      "ref_delete_done",
+      "full_text_decision",
+      "full_text_exclusion_reason",
+      "full_text_rq_tags",
+      "full_text_rq_findings_map",
+      "full_text_rq1_findings_summary",
+      "full_text_rq2_findings_summary",
+      "full_text_notes",
+      "full_text_screening_status",
+      "full_text_screening_provider",
+      "full_text_screening_model",
+      "full_text_screening_error",
+      "full_text_screened_at",
+      "full_text_summery",
+      "full_text_extraction",
+      "full_text_quality",
+      "full_text_tccm",
+      "full_text_summery_status",
+      "full_text_summery_error",
+      "full_text_summery_updated_at"
+    ],
+    "ThemeSynthesis": [
+      "id",
+      "review",
+      "theme_name_locked",
+      "evidence_grade",
+      "paper_count",
+      "pct_of_corpus",
+      "finding_direction",
+      "designs_represented",
+      "grade_rationale",
+      "theme_description",
+      "order_index",
+      "advocate_notes",
+      "critic_notes",
+      "reconciler_notes",
+      "reconciled_text"
+    ]
+  },
+  "scaffold_data_keys": {
+    "top_level": [
+      "conceptual_model_graph_payload",
+      "conceptual_model_narrative",
+      "conceptual_model_spec",
+      "consistency_checks",
+      "evidence_grades",
+      "ingest_quality",
+      "paper_registry",
+      "phase_2",
+      "phase_3",
+      "pico",
+      "prisma_counts",
+      "quality_summary",
+      "research_questions",
+      "review_metadata",
+      "sensitivity_results",
+      "subgroup_data",
+      "tccm_summary",
+      "theme_names",
+      "theme_scaffold_locked_at",
+      "theoretical_framework",
+      "theoretical_synthesis",
+      "theory_landscape"
+    ],
+    "theoretical_synthesis_nested": [
+      "propositions",
+      "revised_framework_narrative",
+      "third_order_synthesis"
+    ],
+    "prisma_counts_nested": [
+      "after_dedup",
+      "eligibility",
+      "final_included",
+      "fulltext_excluded",
+      "identification",
+      "included",
+      "missing_abstracts",
+      "passed_fulltext",
+      "passed_ta",
+      "pdfs_retrieved",
+      "scopus_retrieved",
+      "screening",
+      "screening_excluded",
+      "screening_total"
+    ],
+    "subgroup_data_nested": [
+      "by_country",
+      "by_design",
+      "by_year",
+      "sankey_eligible",
+      "year_span",
+      "year_subgroup_eligible"
+    ]
+  },
+  "prompt_placeholders": {
+    "all_unique": [
+      "SECTION_LABEL_BLOCK",
+      "absent_theories_formatted",
+      "abstract_only",
+      "abstract_only_count",
+      "advocate_text",
+      "after_dedup",
+      "all_extractions_json",
+      "all_reconciled_texts_formatted",
+      "all_reconciled_texts_with_theme_names",
+      "all_tccm_json",
+      "all_theoretical_frameworks_json",
+      "auto_include_floor",
+      "auto_included_count",
+      "by_country_formatted",
+      "by_design_formatted",
+      "by_year_groups_formatted",
+      "confidence_threshold",
+      "context_block",
+      "country_subgroup_note",
+      "critic_text",
+      "date_range",
+      "emerging_max",
+      "emerging_min",
+      "end_filter",
+      "end_year",
+      "established_threshold",
+      "evidence_grade",
+      "exclusion_criteria",
+      "final_included",
+      "inclusion_criteria",
+      "insufficient_threshold",
+      "lens_pct_of_corpus",
+      "minerU_full_paper_text",
+      "objectives",
+      "paper_count",
+      "paper_text",
+      "paper_title",
+      "passed_fulltext",
+      "passed_ta",
+      "pdfs_retrieved",
+      "pico_comparison",
+      "pico_intervention",
+      "pico_outcomes",
+      "pico_population",
+      "previous_section_text",
+      "primary_lens",
+      "primary_term",
+      "primary_theoretical_lens",
+      "primary_topic",
+      "propositions_formatted",
+      "propositions_or_omit",
+      "propositions_testing_subsection_or_omit",
+      "raw_response",
+      "raw_text",
+      "research_questions",
+      "rq1_answer",
+      "rq1_text",
+      "rq2_text",
+      "rq3_paragraph_if_applicable",
+      "rq3_text",
+      "rq_answers_formatted",
+      "rq_count",
+      "rq_list",
+      "rq_list_numbered",
+      "rq_numbered_list",
+      "scaffold_preamble",
+      "scopus_retrieved",
+      "section_instructions",
+      "section_name",
+      "section_specific_payload",
+      "start_filter",
+      "start_year",
+      "subgroup_data_formatted",
+      "supporting_lenses",
+      "synthesis_gaps_formatted",
+      "target_words",
+      "tccm_key_gaps_or_omit",
+      "theme_count",
+      "theme_extractions_json",
+      "theme_grades_formatted",
+      "theme_name",
+      "theoretical_gaps_formatted",
+      "theoretical_gaps_or_omit",
+      "theoretical_landscape_summary",
+      "third_order_synthesis_text",
+      "titles_block",
+      "total_papers",
+      "user_excluded",
+      "user_excluded_count",
+      "year_subgroup_eligible"
+    ],
+    "by_file": {
+      "final_writeup.md": [
+        "abstract_only",
+        "abstract_only_count",
+        "after_dedup",
+        "all_reconciled_texts_with_theme_names",
+        "auto_include_floor",
+        "auto_included_count",
+        "confidence_threshold",
+        "end_year",
+        "final_included",
+        "paper_count",
+        "passed_fulltext",
+        "passed_ta",
+        "pdfs_retrieved",
+        "previous_section_text",
+        "primary_term",
+        "rq1_text",
+        "rq2_text",
+        "rq3_text",
+        "rq_count",
+        "scopus_retrieved",
+        "section_name",
+        "section_specific_payload",
+        "start_year",
+        "theme_count",
+        "user_excluded",
+        "user_excluded_count"
+      ],
+      "phase_15_fulltext_screening.md": [
+        "context_block",
+        "paper_text",
+        "paper_title"
+      ],
+      "phase_15_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_16_deepseek_summary.md": [
+        "minerU_full_paper_text"
+      ],
+      "phase_16_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_17_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_17_theme_synthesis.md": [
+        "all_extractions_json",
+        "emerging_max",
+        "emerging_min",
+        "established_threshold",
+        "insufficient_threshold",
+        "objectives",
+        "rq_list_numbered",
+        "total_papers"
+      ],
+      "phase_17a_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_17a_theory_landscape.md": [
+        "all_theoretical_frameworks_json",
+        "objectives",
+        "rq_list",
+        "total_papers"
+      ],
+      "phase_17b_cross_theme_theoretical_synthesis.md": [
+        "all_reconciled_texts_with_theme_names",
+        "objectives",
+        "primary_theoretical_lens",
+        "rq_list",
+        "supporting_lenses",
+        "theme_count",
+        "theoretical_gaps_formatted",
+        "theoretical_landscape_summary"
+      ],
+      "phase_17b_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_18_advocate.md": [
+        "evidence_grade",
+        "scaffold_preamble",
+        "theme_extractions_json",
+        "theme_name"
+      ],
+      "phase_18_critic.md": [
+        "advocate_text",
+        "scaffold_preamble",
+        "theme_extractions_json"
+      ],
+      "phase_18_reconciler.md": [
+        "advocate_text",
+        "critic_text",
+        "primary_lens",
+        "scaffold_preamble",
+        "theme_extractions_json",
+        "theme_name"
+      ],
+      "phase_18_text_correction.md": [
+        "raw_text",
+        "target_words"
+      ],
+      "phase_18_thin_theme.md": [
+        "scaffold_preamble",
+        "theme_extractions_json",
+        "theme_name"
+      ],
+      "phase_19_conceptual_model_spec.md": [
+        "all_reconciled_texts_with_theme_names",
+        "primary_theoretical_lens",
+        "primary_topic",
+        "propositions_formatted",
+        "subgroup_data_formatted"
+      ],
+      "phase_19_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_20_tccm_aggregation.md": [
+        "all_tccm_json",
+        "date_range",
+        "objectives",
+        "primary_topic",
+        "rq_list",
+        "total_papers"
+      ],
+      "phase_20_tccm_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_23_1_0_introduction.md": [
+        "rq_count"
+      ],
+      "phase_23_1_0_introduction_theory_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "objectives",
+        "rq_count",
+        "rq_numbered_list"
+      ],
+      "phase_23_1_0_introduction_theory_on.md": [
+        "SECTION_LABEL_BLOCK",
+        "absent_theories_formatted",
+        "lens_pct_of_corpus",
+        "objectives",
+        "primary_theoretical_lens",
+        "rq_count",
+        "rq_numbered_list"
+      ],
+      "phase_23_2_1_search_strategy.md": [],
+      "phase_23_2_2_selection_criteria.md": [],
+      "phase_23_2_3_quality_method.md": [],
+      "phase_23_2_3_study_selection_process.md": [
+        "auto_include_floor",
+        "auto_included_count",
+        "confidence_threshold",
+        "paper_count",
+        "user_excluded_count"
+      ],
+      "phase_23_2_4_data_extraction.md": [],
+      "phase_23_2_4_data_extraction_theory_off_tccm_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "final_included",
+        "theme_count"
+      ],
+      "phase_23_2_4_data_extraction_theory_off_tccm_on.md": [],
+      "phase_23_2_4_data_extraction_theory_on_tccm_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "final_included",
+        "primary_theoretical_lens",
+        "theme_count"
+      ],
+      "phase_23_2_4_data_extraction_theory_on_tccm_on.md": [
+        "SECTION_LABEL_BLOCK",
+        "final_included",
+        "lens_pct_of_corpus",
+        "primary_theoretical_lens",
+        "theme_count"
+      ],
+      "phase_23_2_4_data_synthesis_method.md": [],
+      "phase_23_3_1_study_selection.md": [
+        "abstract_only",
+        "after_dedup",
+        "final_included",
+        "passed_fulltext",
+        "passed_ta",
+        "pdfs_retrieved",
+        "scopus_retrieved",
+        "user_excluded"
+      ],
+      "phase_23_3_2_study_characteristics.md": [],
+      "phase_23_3_2b_tccm_analysis.md": [],
+      "phase_23_3_3_quality_results.md": [],
+      "phase_23_3_4_bibliometric_findings.md": [],
+      "phase_23_3_5_synthesis_of_themes.md": [
+        "theme_count"
+      ],
+      "phase_23_3_5_synthesis_of_themes_theory_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "all_reconciled_texts_formatted",
+        "theme_count",
+        "theme_grades_formatted"
+      ],
+      "phase_23_3_5_synthesis_of_themes_theory_on.md": [
+        "theme_count"
+      ],
+      "phase_23_3_6_subgroup_analysis.md": [],
+      "phase_23_3_6_subgroup_analysis_sensitivity_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "by_country_formatted",
+        "by_design_formatted",
+        "by_year_groups_formatted",
+        "country_subgroup_note",
+        "year_subgroup_eligible"
+      ],
+      "phase_23_3_6_subgroup_analysis_sensitivity_on.md": [],
+      "phase_23_3_7_theory_landscape.md": [],
+      "phase_23_3_8_theoretical_synthesis.md": [],
+      "phase_23_4_0_discussion.md": [
+        "primary_term",
+        "rq1_text",
+        "rq2_text",
+        "rq3_text"
+      ],
+      "phase_23_4_0_discussion_no_conceptual.md": [
+        "primary_term",
+        "rq1_text",
+        "rq2_text",
+        "rq3_text"
+      ],
+      "phase_23_4_0_discussion_theory_off_no_conceptual.md": [
+        "SECTION_LABEL_BLOCK",
+        "primary_topic",
+        "rq1_answer",
+        "rq1_text",
+        "rq3_paragraph_if_applicable",
+        "rq_answers_formatted"
+      ],
+      "phase_23_4_0_discussion_theory_on_no_conceptual.md": [
+        "SECTION_LABEL_BLOCK",
+        "primary_theoretical_lens",
+        "propositions_formatted",
+        "rq3_paragraph_if_applicable",
+        "rq_answers_formatted",
+        "tccm_key_gaps_or_omit",
+        "third_order_synthesis_text"
+      ],
+      "phase_23_5_0_conclusion.md": [
+        "abstract_only_count",
+        "rq1_text",
+        "rq2_text",
+        "rq3_text"
+      ],
+      "phase_23_5_0_conclusion_theory_off_future_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "final_included",
+        "rq_answers_formatted",
+        "synthesis_gaps_formatted",
+        "theme_count"
+      ],
+      "phase_23_5_0_conclusion_theory_off_future_on.md": [
+        "SECTION_LABEL_BLOCK",
+        "final_included",
+        "rq_answers_formatted",
+        "theme_count"
+      ],
+      "phase_23_5_0_conclusion_theory_on_future_off.md": [],
+      "phase_23_5_0_conclusion_theory_on_future_on.md": [],
+      "phase_23_6_0_future_research_tccm_off.md": [
+        "SECTION_LABEL_BLOCK",
+        "propositions_or_omit",
+        "propositions_testing_subsection_or_omit",
+        "synthesis_gaps_formatted",
+        "theme_name",
+        "theoretical_gaps_or_omit"
+      ],
+      "phase_23_6_0_future_research_tccm_on.md": [],
+      "phase_23_abstract.md": [
+        "end_year",
+        "final_included",
+        "rq_count",
+        "start_year",
+        "theme_count"
+      ],
+      "phase_23_abstract_all_features_core_on.md": [],
+      "phase_23_abstract_light.md": [
+        "end_year",
+        "final_included",
+        "rq_count",
+        "start_year",
+        "theme_count"
+      ],
+      "phase_23_references.md": [],
+      "phase_23_shell.md": [
+        "previous_section_text",
+        "scaffold_preamble",
+        "section_instructions",
+        "section_name",
+        "section_specific_payload"
+      ],
+      "phase_2_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_2_rq_formalization.md": [
+        "exclusion_criteria",
+        "inclusion_criteria",
+        "objectives",
+        "pico_comparison",
+        "pico_intervention",
+        "pico_outcomes",
+        "pico_population"
+      ],
+      "phase_3_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_3_scopus_queries.md": [
+        "end_filter",
+        "end_year",
+        "objectives",
+        "research_questions",
+        "start_filter",
+        "start_year"
+      ],
+      "phase_6_title_screening.md": [
+        "objectives",
+        "pico_comparison",
+        "pico_intervention",
+        "pico_outcomes",
+        "pico_population",
+        "research_questions",
+        "titles_block"
+      ],
+      "phase_6_title_screening_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_7_json_correction.md": [
+        "raw_response"
+      ],
+      "phase_7_ta_screening.md": [],
+      "scaffold.md": []
+    }
+  },
+  "notes": {
+    "source": "Generated from models + existing Review.scaffold_data + reviews/prompts/phase_*.md placeholders",
+    "generated_for": "SLR app only"
+  }
+}
